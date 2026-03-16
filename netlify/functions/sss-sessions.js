@@ -1,4 +1,4 @@
-const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxeHS-y_44HLdt8wZlCe29RlreXsdTgY40VKWJz17MbpfZ541x6cM8rQIWN-sSHK0Oj6g/exec";
+const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyDKIs_ktJ7w041hVMvxvHIL1l9R70h2G7AXi1nMvD1o-LNn7-GgTlKJA-XUJBqemUHfA/exec";
 const PROXY_SHARED_SECRET = process.env.SSS_PROXY_SECRET || "_005urNTXHuA8_gOIqS6QOYMAKwVPBE3gDwl1Ls_gBM";
 
 function corsHeaders() {
