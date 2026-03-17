@@ -168,6 +168,9 @@
       gap:10px;
       font-size:12px;
     }
+    .activity-list.is-loading {
+      min-height: 150px;
+    }
 
     .activity-row {
       display:grid;
@@ -248,8 +251,9 @@
       align-items:center;
       justify-content:center;
       gap:12px;
-      padding:10px 16px 8px;
-      margin:2px 0 6px;
+      width:100%;
+      padding:6px 0 8px;
+      margin:0;
       text-align:center;
     }
     .session-status-hero[hidden] { display:none !important; }
@@ -387,6 +391,18 @@
     justify-content: center;
   }
 
+  .session-status-hero{
+    padding: 6px 4px 8px;
+  }
+  .session-status-hero__logo{
+    width: 82px;
+    max-width: 42vw;
+  }
+  .session-status-hero__text{
+    font-size: 13px;
+    max-width: 300px;
+  }
+
   /* Your existing responsive behavior */
   .activity-row{
     grid-template-columns: minmax(0,1fr);
@@ -455,17 +471,17 @@
         </div>
       </div>
 
-      <div class="session-status-hero" id="session-status-hero" aria-live="polite">
-        <img
-          src="https://images.squarespace-cdn.com/content/68c441422ebffe2e9bfd31ed/a323dcda-562c-4f58-a955-c26cc0207bed/ISS-Logo.png?content-type=image%2Fpng"
-          alt="Illinois Skill Schools logo"
-          class="session-status-hero__logo is-animating"
-          id="session-status-hero-logo">
-        <div class="session-status-hero__text" id="session-status-hero-text">Loading session…</div>
-      </div>
-
       <div class="activities-label">Session activities</div>
-      <div class="activity-list" id="activity-list"></div>
+      <div class="activity-list is-loading" id="activity-list">
+        <div class="session-status-hero" id="session-status-hero" aria-live="polite">
+          <img
+            src="https://images.squarespace-cdn.com/content/68c441422ebffe2e9bfd31ed/a323dcda-562c-4f58-a955-c26cc0207bed/ISS-Logo.png?content-type=image%2Fpng"
+            alt="Illinois Skill Schools logo"
+            class="session-status-hero__logo is-animating"
+            id="session-status-hero-logo">
+          <div class="session-status-hero__text" id="session-status-hero-text">Loading session…</div>
+        </div>
+      </div>
 
       <footer class="session-footer">
         <span>© Soccer Skill Schools</span>
@@ -813,7 +829,13 @@ function showExpiryOnPage(plan) {
       const hero = document.getElementById('session-status-hero');
       const logo = document.getElementById('session-status-hero-logo');
       const text = document.getElementById('session-status-hero-text');
+      const listEl = document.getElementById('activity-list');
       if (!hero || !logo || !text) return;
+
+      if (listEl && hero.parentNode !== listEl) {
+        listEl.prepend(hero);
+      }
+      if (listEl) listEl.classList.add('is-loading');
 
       hero.hidden = false;
       hero.classList.remove('is-error', 'is-ok');
@@ -826,7 +848,9 @@ function showExpiryOnPage(plan) {
 
     function hideStatusHero() {
       const hero = document.getElementById('session-status-hero');
+      const listEl = document.getElementById('activity-list');
       if (hero) hero.hidden = true;
+      if (listEl) listEl.classList.remove('is-loading');
     }
 
     function showViewerStatusOnly(message, tone) {
@@ -837,7 +861,10 @@ function showExpiryOnPage(plan) {
       const expiredEl = document.getElementById('expired-message');
 
       setStatusHero(message, tone || 'error', false);
-      if (listEl) listEl.innerHTML = '';
+      if (listEl) {
+        listEl.classList.add('is-loading');
+        listEl.innerHTML = '';
+      }
       if (metaEl) metaEl.style.display = 'none';
       if (labelEl) labelEl.style.display = 'none';
       if (expiredEl) expiredEl.style.display = 'none';
