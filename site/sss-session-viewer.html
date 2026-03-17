@@ -387,6 +387,15 @@
         <div class="session-brand" style="text-align:right;">Session Plan</div>
       </header>
 
+      <div class="session-status-hero" id="session-status-hero" aria-live="polite">
+        <img
+          src="https://images.squarespace-cdn.com/content/68c441422ebffe2e9bfd31ed/a323dcda-562c-4f58-a955-c26cc0207bed/ISS-Logo.png?content-type=image%2Fpng"
+          alt="Illinois Skill Schools logo"
+          class="session-status-hero__logo is-animating"
+          id="session-status-hero-logo">
+        <div class="session-status-hero__text" id="session-status-hero-text">Loading session…</div>
+      </div>
+
            <div class="session-actions">
         <button type="button" class="btn" id="download-pdf-btn">
           Download PDF
@@ -418,11 +427,7 @@
       </div>
 
       <div class="activities-label">Session activities</div>
-      <div class="activity-list" id="activity-list">
-        <p class="empty-message">
-          Loading shared session…
-        </p>
-      </div>
+      <div class="activity-list" id="activity-list"></div>
 
       <footer class="session-footer">
         <span>© Soccer Skill Schools</span>
@@ -601,7 +606,6 @@
 
     const MAX_PDF_ACTIVITIES = 15;
     const MAX_PDF_ACTIVITIES_PER_PAGE = 4;
-    const IS_SAFARI_BROWSER = /^((?!chrome|android|crios|fxios|edgios).)*safari/i.test(navigator.userAgent || '');
 
     let currentPlan = null;
 
@@ -766,33 +770,47 @@ function showExpiryOnPage(plan) {
   el.style.display = 'block';
 }
 
-function setActivityListMessage(message, tone) {
-  const listEl = document.getElementById('activity-list');
-  if (!listEl) return;
 
-  const color = tone === 'error'
-    ? '#b91c1c'
-    : (tone === 'ok' ? '#166534' : '');
+    function setStatusHero(message, tone, animate) {
+      const hero = document.getElementById('session-status-hero');
+      const logo = document.getElementById('session-status-hero-logo');
+      const text = document.getElementById('session-status-hero-text');
+      if (!hero || !logo || !text) return;
 
-  listEl.innerHTML = '<p class="empty-message"' + (color ? ' style="color:' + color + ';"' : '') + '>' + message + '</p>';
-}
+      hero.hidden = false;
+      hero.classList.remove('is-error', 'is-ok');
+      if (tone === 'error') hero.classList.add('is-error');
+      if (tone === 'ok') hero.classList.add('is-ok');
+
+      logo.classList.toggle('is-animating', !!animate);
+      text.textContent = message || '';
+    }
+
+    function hideStatusHero() {
+      const hero = document.getElementById('session-status-hero');
+      if (hero) hero.hidden = true;
+    }
+
+    function showViewerStatusOnly(message, tone) {
+      const listEl  = document.getElementById('activity-list');
+      const metaEl  = document.querySelector('.session-meta');
+      const labelEl = document.querySelector('.activities-label');
+      const pdfBtn  = document.getElementById('download-pdf-btn');
+      const expiredEl = document.getElementById('expired-message');
+
+      setStatusHero(message, tone || 'error', false);
+      if (listEl) listEl.innerHTML = '';
+      if (metaEl) metaEl.style.display = 'none';
+      if (labelEl) labelEl.style.display = 'none';
+      if (expiredEl) expiredEl.style.display = 'none';
+      if (pdfBtn) pdfBtn.disabled = true;
+    }
 
 
     function showExpiredState(plan) {
       const expiredEl = document.getElementById('expired-message');
-      const listEl    = document.getElementById('activity-list');
-      const metaEl    = document.querySelector('.session-meta');
-      const labelEl   = document.querySelector('.activities-label');
-
-      if (expiredEl) expiredEl.style.display = 'block';
-      if (listEl) listEl.innerHTML = '';
-      if (metaEl) metaEl.style.display = 'none';
-      if (labelEl) labelEl.style.display = 'none';
-
-      const pdfBtn = document.getElementById('download-pdf-btn');
-      if (pdfBtn) {
-        pdfBtn.disabled = true;
-      }
+      if (expiredEl) expiredEl.style.display = 'none';
+      showViewerStatusOnly('This shared session link has expired. Please contact your coach for a new link.', 'error');
     }
 
 
@@ -830,10 +848,12 @@ function setActivityListMessage(message, tone) {
 
       const rows = Array.isArray(plan.rows) ? plan.rows : [];
       if (!rows.length) {
-        listEl.innerHTML = '<p class="empty-message">No activities found in this shared session.</p>';
+        setStatusHero('No activities found in this shared session.', 'error', false);
+        listEl.innerHTML = '';
         return;
       }
 
+      hideStatusHero();
       listEl.innerHTML = '';
       rows.forEach((row, index) => {
         const drill = DRILL_BY_ID.get(row.drillId) || {};
@@ -943,7 +963,7 @@ function setActivityListMessage(message, tone) {
         : '';
 
       return `
-        <article class="sss-print-row${IS_SAFARI_BROWSER ? ' sss-print-row--safari' : ''}" style="${IS_SAFARI_BROWSER ? '' : ('min-height:' + minHeightPx + 'px;')}">
+        <article class="sss-print-row" style="min-height:${minHeightPx}px;">
           <div class="sss-print-visual">
             ${
               imgUrl
@@ -1206,42 +1226,9 @@ function setActivityListMessage(message, tone) {
           color: #9ca3af;
           text-align: right;
         }
-
-        .sss-print-safari {
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
-          text-rendering: optimizeLegibility;
-          -webkit-font-smoothing: antialiased;
-        }
-
-        .sss-print-safari .sss-print-page {
-          min-height: 0;
-        }
-
-        .sss-print-safari .sss-print-row,
-        .sss-print-row--safari {
-          min-height: auto !important;
-        }
-
-        .sss-print-safari .sss-print-visual {
-          height: auto;
-          min-height: 0;
-          aspect-ratio: 4 / 3;
-        }
-
-        .sss-print-safari .sss-print-visual img {
-          width: 100%;
-          max-width: 100%;
-          max-height: none;
-          height: auto;
-          object-fit: contain;
-          image-rendering: auto;
-          transform: translateZ(0);
-          -webkit-transform: translateZ(0);
-        }
       </style>
     </head>
-    <body class="${IS_SAFARI_BROWSER ? 'sss-print-safari' : ''}">
+    <body>
       ${pagesHtml}
     </body>
     </html>
@@ -1249,76 +1236,44 @@ function setActivityListMessage(message, tone) {
   printWindow.document.close();
 
   printWindow.onload = function() {
-    const doPrint = function() {
-      setTimeout(function() {
-        printWindow.focus();
-        printWindow.print();
-      }, IS_SAFARI_BROWSER ? 900 : 300);
-    };
-
-    try {
-      const doc = printWindow.document;
-      const imgPromises = Array.from(doc.images || []).map(img => {
-        if (img.complete) return Promise.resolve();
-        return new Promise(resolve => {
-          const done = () => resolve();
-          img.addEventListener('load', done, { once:true });
-          img.addEventListener('error', done, { once:true });
-        });
-      });
-
-      const fontsReady = doc.fonts && doc.fonts.ready
-        ? doc.fonts.ready.catch(() => {})
-        : Promise.resolve();
-
-      Promise.all([fontsReady].concat(imgPromises)).then(() => {
-        if (IS_SAFARI_BROWSER && printWindow.requestAnimationFrame) {
-          printWindow.requestAnimationFrame(() => {
-            printWindow.requestAnimationFrame(doPrint);
-          });
-        } else {
-          doPrint();
-        }
-      });
-    } catch (e) {
-      doPrint();
-    }
+    setTimeout(function() {
+      printWindow.focus();
+      printWindow.print();
+    }, 300);
   };
 }
 
         (async function init() {
-      if (pdfBtn) pdfBtn.disabled = true;
-
-      setActivityListMessage('Loading shared session…');
+      setStatusHero('Loading session…', '', true);
 
       const sessionId = getSharedSessionIdFromUrl();
       if (!sessionId) {
-        setActivityListMessage('No shared session ID was found in this link.', 'error');
+        showViewerStatusOnly('No shared session ID was found in this link.', 'error');
         return;
       }
 
       const sharedRes = await fetchSharedSessionById(sessionId);
       if (!sharedRes || !sharedRes.ok || !sharedRes.session) {
-        setActivityListMessage((sharedRes && sharedRes.error) ? sharedRes.error : 'Could not load this shared session.', 'error');
+        showViewerStatusOnly((sharedRes && sharedRes.error) ? sharedRes.error : 'Could not load this shared session.', 'error');
         return;
       }
 
       const plan = parseSharedSessionPayload(sharedRes.session);
       if (!plan) {
-        setActivityListMessage('This shared session did not contain a valid payload.', 'error');
+        showViewerStatusOnly('This shared session did not contain a valid payload.', 'error');
         return;
       }
 
       currentPlan = plan;
       showExpiryOnPage(plan);
-      setActivityListMessage('Loading session activities…');
+      setStatusHero('Loading session activities…', '', true);
 
       try {
         await loadDrillsViaJSONP();
         console.log('Loaded drills:', DRILLS.length);
       } catch (e) {
         console.error(e);
-        setActivityListMessage('Could not load drill library. Check Apps Script URL / permissions.', 'error');
+        showViewerStatusOnly('Could not load drill library. Check Apps Script URL / permissions.', 'error');
         return;
       }
 
@@ -1327,10 +1282,9 @@ function setActivityListMessage(message, tone) {
         showExpiredState(plan);
       } else {
         renderSession(plan);
-        if (pdfBtn) pdfBtn.disabled = false;
       }
 
-})();
+    })();
 
   </script>
 </body>
