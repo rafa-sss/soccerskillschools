@@ -772,7 +772,7 @@ if (pdfBtn) {
         if (!expiry && plan.generatedAt) {
           const g = new Date(plan.generatedAt);
           if (!isNaN(g.getTime())) {
-            expiry = new Date(g.getTime() + 30 * 24 * 60 * 60 * 1000);
+            expiry = new Date(g.getTime() + 90 * 24 * 60 * 60 * 1000);
           }
         }
 
@@ -899,7 +899,8 @@ function showExpiryOnPage(plan) {
     });
 
     // ===== Render the shared session =====
-    function renderSession(plan) {
+    function renderSession(plan, options) {
+      options = options || {};
       const dateEl   = document.getElementById('meta-date');
       const coachEl  = document.getElementById('meta-coach');
       const ageEl    = document.getElementById('meta-age');
@@ -918,14 +919,31 @@ function showExpiryOnPage(plan) {
         return;
       }
 
-      hideStatusHero();
-      listEl.innerHTML = '';
+      const hero = document.getElementById('session-status-hero');
+      if (!options.keepStatusHero) {
+        hideStatusHero();
+        listEl.innerHTML = '';
+      } else {
+        const preservedHero = hero && hero.parentNode === listEl ? hero : null;
+        listEl.innerHTML = '';
+        if (preservedHero) listEl.appendChild(preservedHero);
+      }
+      const pdfBtn = document.getElementById('download-pdf-btn');
+      if (pdfBtn) pdfBtn.disabled = false;
       rows.forEach((row, index) => {
         const drill = DRILL_BY_ID.get(row.drillId) || {};
-        const imgUrl   = drill.imageUrl || '';
-        const videoUrl = drill.videoUrl || '';
-        const pdfUrl   = drill.pdfUrl   || '';
-        const notes    = row.notes || drill.defaultNotes || '';
+        const fallbackDrill = {
+          name: row.drillName || '',
+          imageUrl: row.imageUrl || '',
+          videoUrl: row.videoUrl || '',
+          pdfUrl: row.pdfUrl || '',
+          defaultNotes: row.defaultNotes || ''
+        };
+        const mergedDrill = Object.assign({}, fallbackDrill, drill || {});
+        const imgUrl   = mergedDrill.imageUrl || '';
+        const videoUrl = mergedDrill.videoUrl || '';
+        const pdfUrl   = mergedDrill.pdfUrl   || '';
+        const notes    = row.notes || mergedDrill.defaultNotes || '';
         const time     = row.time || '';
 
         const article = document.createElement('article');
@@ -936,7 +954,7 @@ function showExpiryOnPage(plan) {
             <div class="activity-visual-inner">
               ${
                 imgUrl
-                  ? `<img src="${imgUrl}" alt="${drill.name || 'Session diagram'}">`
+                  ? `<img src="${imgUrl}" alt="${mergedDrill.name || 'Session diagram'}">`
                   : `<div style="padding:18px;color:#e5e7eb;font-size:11px;text-align:center;">Session diagram</div>`
               }
               <div class="activity-visual-hint">
@@ -949,7 +967,7 @@ function showExpiryOnPage(plan) {
             </div>
           </div>
           <div class="activity-notes">
-            <h3>${index + 1}. ${drill.name || ''}</h3>
+            <h3>${index + 1}. ${mergedDrill.name || 'Activity'}</h3>
             ${time ? `<p class="activity-time"><strong>Time:</strong> ${time}</p>` : ''}
             ${
               notes
@@ -1019,9 +1037,17 @@ function showExpiryOnPage(plan) {
     const activitiesHtml = pageRows.map((row, idxOnPage) => {
       const globalIndex = pageIndex * MAX_PER_PAGE + idxOnPage + 1;
       const drill = DRILL_BY_ID.get(row.drillId) || {};
-      const notesText = row.notes || drill.defaultNotes || '';
+      const fallbackDrill = {
+        name: row.drillName || '',
+        imageUrl: row.imageUrl || '',
+        videoUrl: row.videoUrl || '',
+        pdfUrl: row.pdfUrl || '',
+        defaultNotes: row.defaultNotes || ''
+      };
+      const mergedDrill = Object.assign({}, fallbackDrill, drill || {});
+      const notesText = row.notes || mergedDrill.defaultNotes || '';
       const timeText  = row.time || '';
-      const imgUrl    = drill.imageUrl || '';
+      const imgUrl    = mergedDrill.imageUrl || '';
 
       const notesHtml = notesText
         ? '<p>' + notesText.replace(/\n/g, '<br>') + '</p>'
@@ -1032,12 +1058,12 @@ function showExpiryOnPage(plan) {
           <div class="sss-print-visual">
             ${
               imgUrl
-                ? `<img src="${imgUrl}" alt="${drill.name || 'Session diagram'}">`
+                ? `<img src="${imgUrl}" alt="${mergedDrill.name || 'Session diagram'}">`
                 : '<div class="sss-print-visual__placeholder">Session diagram</div>'
             }
           </div>
           <div class="sss-print-notes">
-            <h3 class="sss-print-activity-title">${globalIndex}. ${drill.name || ''}</h3>
+            <h3 class="sss-print-activity-title">${globalIndex}. ${mergedDrill.name || 'Activity'}</h3>
             ${timeText ? `<p class="sss-print-activity-time"><strong>Time:</strong> ${timeText}</p>` : ''}
             ${notesHtml}
           </div>
@@ -1333,20 +1359,23 @@ function showExpiryOnPage(plan) {
       showExpiryOnPage(plan);
       setStatusHero('Loading session activities…', '', true);
 
+      let drillLibraryLoaded = false;
       try {
         await loadDrillsViaJSONP();
+        drillLibraryLoaded = true;
         console.log('Loaded drills:', DRILLS.length);
       } catch (e) {
         console.error(e);
-        showViewerStatusOnly('Could not load drill library. Check Apps Script URL / permissions.', 'error');
-        return;
       }
 
       const expired = isPlanExpired(plan);
       if (expired) {
         showExpiredState(plan);
-      } else {
+      } else if (drillLibraryLoaded) {
         renderSession(plan);
+      } else {
+        setStatusHero('Showing saved session without drill media.', 'error', false);
+        renderSession(plan, { keepStatusHero:true });
       }
 
     })();
