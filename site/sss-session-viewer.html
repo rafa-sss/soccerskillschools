@@ -237,6 +237,43 @@
       text-decoration:underline;
     }
 
+
+    @keyframes sssLogoScale {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.12); }
+    }
+    .session-status-hero {
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:12px;
+      padding:22px 16px 10px;
+      text-align:center;
+    }
+    .session-status-hero[hidden] { display:none !important; }
+    .session-status-hero__logo {
+      width:96px;
+      max-width:35vw;
+      height:auto;
+      display:block;
+      transform-origin:center center;
+      will-change:transform;
+    }
+    .session-status-hero__logo.is-animating {
+      animation:sssLogoScale 1.7s ease-in-out infinite;
+    }
+    .session-status-hero__text {
+      font-size:14px;
+      line-height:1.45;
+      font-weight:700;
+      color:var(--ink);
+      max-width:440px;
+      margin:0 auto;
+    }
+    .session-status-hero.is-error .session-status-hero__text { color:#b91c1c; }
+    .session-status-hero.is-ok .session-status-hero__text { color:#166534; }
+
     .empty-message {
       font-size:13px;
       color:var(--sub);
