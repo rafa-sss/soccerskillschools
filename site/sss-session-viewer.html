@@ -995,7 +995,8 @@ function showExpiryOnPage(plan) {
     }
 
     // ===== PDF generation from shared plan =====
-   function downloadPdfFromPlan(plan) {
+   
+function downloadPdfFromPlan(plan) {
   const rows = Array.isArray(plan.rows) ? plan.rows : [];
   const selectedRows = rows.filter(r => !!r.drillId);
 
@@ -1012,8 +1013,15 @@ function showExpiryOnPage(plan) {
   const coachVal = plan.coach || '';
   const ageVal   = plan.ageGroup || '';
   const themeVal = plan.theme || '';
-
+  const isSafariPrint = /^((?!chrome|android|crios|fxios|edgios).)*safari/i.test(navigator.userAgent || '');
+  const isMobileSafariPrint = /iP(?:hone|ad|od)/i.test(navigator.userAgent || '') && isSafariPrint;
   const MAX_PER_PAGE = MAX_PDF_ACTIVITIES_PER_PAGE;
+  const esc = (value) => String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+  const nl2br = (value) => esc(value).replace(/\n/g, '<br>');
 
   const pages = [];
   for (let i = 0; i < selectedRows.length; i += MAX_PER_PAGE) {
@@ -1022,16 +1030,12 @@ function showExpiryOnPage(plan) {
 
   const pagesHtml = pages.map((pageRows, pageIndex) => {
     const rowsPerPage = pageRows.length;
-
-    let minHeightPx;
-    if (rowsPerPage === 1) {
-      minHeightPx = 250;
-    } else if (rowsPerPage === 2) {
-      minHeightPx = 210;
-    } else if (rowsPerPage === 3) {
-      minHeightPx = 175;
-    } else {
-      minHeightPx = 210;
+    let minHeightPx = rowsPerPage >= 4 ? 210 : 250;
+    if (isSafariPrint) {
+      minHeightPx = rowsPerPage >= 4 ? 205 : 245;
+    }
+    if (isMobileSafariPrint) {
+      minHeightPx = rowsPerPage >= 4 ? 190 : 230;
     }
 
     const activitiesHtml = pageRows.map((row, idxOnPage) => {
@@ -1049,76 +1053,66 @@ function showExpiryOnPage(plan) {
       const timeText  = row.time || '';
       const imgUrl    = mergedDrill.imageUrl || '';
 
-      const notesHtml = notesText
-        ? '<p>' + notesText.replace(/\n/g, '<br>') + '</p>'
-        : '';
-
       return `
         <article class="sss-print-row" style="min-height:${minHeightPx}px;">
           <div class="sss-print-visual">
             ${
               imgUrl
-                ? `<img src="${imgUrl}" alt="${mergedDrill.name || 'Session diagram'}">`
+                ? `<img src="${esc(imgUrl)}" alt="${esc(mergedDrill.name || 'Session diagram')}">`
                 : '<div class="sss-print-visual__placeholder">Session diagram</div>'
             }
           </div>
           <div class="sss-print-notes">
-            <h3 class="sss-print-activity-title">${globalIndex}. ${mergedDrill.name || 'Activity'}</h3>
-            ${timeText ? `<p class="sss-print-activity-time"><strong>Time:</strong> ${timeText}</p>` : ''}
-            ${notesHtml}
+            <h3 class="sss-print-activity-title">${globalIndex}. ${esc(mergedDrill.name || 'Activity')}</h3>
+            ${timeText ? `<p class="sss-print-activity-time"><strong>Time:</strong> ${esc(timeText)}</p>` : ''}
+            <div class="sss-print-notes__body">
+              ${notesText ? `<p>${nl2br(notesText)}</p>` : ''}
+            </div>
           </div>
         </article>
       `;
     }).join('');
 
     return `
-      <div class="sss-print-page">
+      <section class="sss-print-page sss-print-page--${rowsPerPage}">
         <div class="sss-print-main">
           <header class="sss-print-header">
             <div class="sss-print-brand">
               <img
                 src="https://images.squarespace-cdn.com/content/68c441422ebffe2e9bfd31ed/a323dcda-562c-4f58-a955-c26cc0207bed/ISS-Logo.png?content-type=image%2Fpng"
-                alt="Illinois Skill Schools logo"
+                alt="Soccer Skill Schools logo"
                 class="sss-print-logo">
             </div>
             <div class="sss-print-title-block">
               <h1 class="sss-print-title">Interactive Session Plan</h1>
-              <p class="sss-print-subtitle">
-                Custom session built from the Soccer Skill Schools game library.
-              </p>
+              <p class="sss-print-subtitle">Custom session built from the Soccer Skill Schools game library.</p>
             </div>
-            <div class="sss-print-brand" style="text-align:right;">Session Plan</div>
+            <div class="sss-print-brand sss-print-brand--right">Session Plan</div>
           </header>
-
           <section class="sss-print-meta">
             <div>
               <div class="sss-print-field-label">Date</div>
-              <div class="sss-print-field-value">${dateVal}</div>
+              <div class="sss-print-field-value">${esc(dateVal)}</div>
             </div>
             <div>
               <div class="sss-print-field-label">Coach</div>
-              <div class="sss-print-field-value">${coachVal}</div>
+              <div class="sss-print-field-value">${esc(coachVal)}</div>
             </div>
             <div>
               <div class="sss-print-field-label">Age group</div>
-              <div class="sss-print-field-value">${ageVal}</div>
+              <div class="sss-print-field-value">${esc(ageVal)}</div>
             </div>
             <div>
               <div class="sss-print-field-label">Session theme</div>
-              <div class="sss-print-field-value">${themeVal}</div>
+              <div class="sss-print-field-value">${esc(themeVal)}</div>
             </div>
           </section>
-
-          <section class="sss-print-activities">
+          <section class="sss-print-activities sss-print-activities--${rowsPerPage}">
             ${activitiesHtml}
           </section>
         </div>
-
-        <footer class="sss-print-footer">
-          © 2016 Soccer Skill Schools. All rights reserved.
-This material is proprietary and may not be reproduced or distributed without express written permission.
-        </footer>
-      </div>
+        <footer class="sss-print-footer">© 2016 Soccer Skill Schools. All rights reserved. This material is proprietary and may not be reproduced or distributed without express written permission.</footer>
+      </section>
     `;
   }).join('');
 
@@ -1131,209 +1125,434 @@ This material is proprietary and may not be reproduced or distributed without ex
     <html>
     <head>
       <meta charset="utf-8">
-      <link rel="stylesheet" href="https://use.typekit.net/uda1vep.css">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
       <title>Session Plan – Soccer Skill Schools</title>
+      <link rel="stylesheet" href="https://use.typekit.net/uda1vep.css">
       <style>
-        @page { size: Letter portrait; margin: 0.32in; }
-
+        @page { size: Letter portrait; margin: 0.26in; }
         * { box-sizing: border-box; }
-
-        body {
+        html, body {
           margin: 0;
-          font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          padding: 0;
           background: #ffffff;
           color: #111827;
+          font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
-
+        body {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+          text-rendering: optimizeLegibility;
+          -webkit-font-smoothing: antialiased;
+        }
         .sss-print-page {
+          width: 100%;
           min-height: auto;
           display: flex;
           flex-direction: column;
           page-break-after: always;
           break-after: page;
         }
-
         .sss-print-page:last-child {
           page-break-after: auto;
           break-after: auto;
         }
-
         .sss-print-main {
+          flex: 1;
           display: flex;
           flex-direction: column;
           min-height: 0;
         }
-
         .sss-print-header {
-          display: flex;
-          justify-content: space-between;
+          display: grid;
+          grid-template-columns: 88px 1fr 112px;
           align-items: center;
           gap: 8px;
-          font-size: 10px;
-          margin-bottom: 4px;
+          margin-bottom: 6px;
         }
-
         .sss-print-brand {
+          font-size: 9px;
           font-weight: 700;
-          letter-spacing: .06em;
+          letter-spacing: 0.18em;
           text-transform: uppercase;
-          font-size: 10px;
+          color: #111827;
         }
-
+        .sss-print-brand--right {
+          text-align: right;
+        }
         .sss-print-logo {
-          height: 72px;
+          height: 58px;
           width: auto;
           display: block;
         }
-
-        @media print {
-          .sss-print-logo { height: 72px; }
-        }
-
         .sss-print-title-block {
-          flex: 1;
           text-align: center;
         }
-
         .sss-print-title {
           margin: 0;
           font-family: "cheddar-gothic-sans", sans-serif;
-          font-weight: 400;
-          font-style: normal;
-          font-size: 18px;
+          font-size: 22px;
           line-height: 1;
-          letter-spacing: 0.03em;
+          letter-spacing: 0.04em;
           text-transform: uppercase;
         }
-
         .sss-print-subtitle {
-          margin: 2px 0 0;
-          font-size: 9px;
+          margin: 3px 0 0;
+          font-size: 10px;
           color: #6b7280;
           letter-spacing: 0.02em;
         }
-
         .sss-print-meta {
           display: grid;
           grid-template-columns: repeat(4, minmax(0,1fr));
-          gap: 3px;
-          font-size: 8px;
-          margin-bottom: 5px;
+          gap: 4px;
+          margin-bottom: 8px;
         }
-
         .sss-print-field-label {
-          font-weight: 600;
+          margin-bottom: 2px;
+          font-size: 8px;
+          font-weight: 700;
           color: #4b5563;
-          margin-bottom: 1px;
+          letter-spacing: 0.08em;
           text-transform: uppercase;
-          letter-spacing: .05em;
         }
-
         .sss-print-field-value {
-          border-radius: 5px;
-          border: 1px solid #e5e7eb;
-          padding: 2px 4px;
-          min-height: 14px;
+          min-height: 17px;
+          padding: 2px 5px;
+          border: 1px solid #dfe3ea;
+          border-radius: 6px;
+          font-size: 9px;
         }
-
         .sss-print-activities {
           display: flex;
           flex-direction: column;
           gap: 4px;
-          font-size: 8px;
+          min-height: 0;
           margin-top: 2px;
         }
-
+        .sss-print-activities--1,
+        .sss-print-activities--2,
+        .sss-print-activities--3,
+        .sss-print-activities--4 {
+          display: flex;
+          flex-direction: column;
+        }
         .sss-print-row {
           display: grid;
           grid-template-columns: 46% 54%;
           gap: 4px;
-          border-radius: 8px;
-          border: 1px solid #e5e7eb;
           padding: 4px;
-          align-items: start;
-          page-break-inside: avoid;
-          break-inside: avoid;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
           background: #ffffff;
+          align-items: start;
+          overflow: visible;
+          height: auto;
+          page-break-inside: avoid !important;
+          break-inside: avoid-page !important;
         }
-
         .sss-print-visual {
-          height: 188px;
-          min-height: 188px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          height: 200px;
+          min-height: 200px;
           border-radius: 8px;
           overflow: hidden;
           background: #f3f4f6;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           margin: 0;
           padding: 0;
         }
-
         .sss-print-visual img {
           display: block;
-          width: auto;
-          height: auto;
           max-width: 100%;
           max-height: 92%;
+          width: auto;
+          height: auto;
+          object-fit: contain;
+          transform: translateZ(0);
+          -webkit-transform: translateZ(0);
           margin: 0 auto;
         }
-
         .sss-print-visual__placeholder {
-          font-size: 8px;
+          font-size: 9px;
           color: #6b7280;
-          padding: 4px;
+          padding: 6px;
           text-align: center;
         }
-
         .sss-print-notes {
+          min-height: 0;
+          overflow: visible;
           display: flex;
           flex-direction: column;
         }
-
         .sss-print-activity-title {
-          margin: 0 0 2px;
-          font-size: 9px;
-          font-weight: 600;
-          line-height: 1.15;
+          margin: 0 0 3px;
+          font-size: 11px;
+          line-height: 1.1;
+          font-weight: 700;
         }
-
         .sss-print-activity-time {
-          margin: 0 0 2px;
-          font-size: 8px;
+          margin: 0 0 4px;
+          font-size: 9px;
           line-height: 1.15;
         }
-
-        .sss-print-notes p {
-          margin: 0 0 1px;
+        .sss-print-notes__body {
+          min-height: 0;
+          overflow: visible;
+          font-size: 9px;
           line-height: 1.18;
-          font-size: 8px;
         }
-
+        .sss-print-notes__body p {
+          margin: 0;
+        }
         .sss-print-footer {
           margin-top: 6px;
           padding-top: 4px;
           border-top: 1px solid #e5e7eb;
-          font-size: 8px;
-          color: #9ca3af;
           text-align: right;
+          color: #9ca3af;
+          font-size: 8px;
+        }
+        
+        body.sss-print-safari .sss-print-page {
+          min-height: auto;
+          overflow: visible;
+        }
+        
+        body.sss-print-safari .sss-print-header {
+          grid-template-columns: 74px 1fr 96px;
+          gap: 6px;
+          margin-bottom: 5px;
+        }
+        
+        body.sss-print-safari .sss-print-logo {
+          height: 48px;
+        }
+        
+        body.sss-print-safari .sss-print-title {
+          font-size: 19px;
+        }
+        
+        body.sss-print-safari .sss-print-subtitle {
+          font-size: 8px;
+          margin-top: 2px;
+        }
+        
+        body.sss-print-safari .sss-print-meta {
+          gap: 3px;
+          margin-bottom: 6px;
+        }
+        
+        body.sss-print-safari .sss-print-field-label {
+          font-size: 7px;
+          margin-bottom: 1px;
+        }
+        
+        body.sss-print-safari .sss-print-field-value {
+          min-height: 15px;
+          padding: 2px 4px;
+          font-size: 8px;
+        }
+        
+        body.sss-print-safari .sss-print-activities {
+          gap: 3px;
+          margin-top: 1px;
+        }
+        
+        body.sss-print-safari .sss-print-row {
+          grid-template-columns: 45% 55%;
+          gap: 3px;
+          padding: 3px;
+          border-radius: 8px;
+        }
+        
+        body.sss-print-safari .sss-print-visual {
+          height: 195px;
+          min-height: 195px;
+        }
+        
+        body.sss-print-safari .sss-print-visual img {
+          max-width: 100%;
+          max-height: 90%;
+        }
+        
+        body.sss-print-safari .sss-print-activity-title {
+          margin-bottom: 3px;
+          font-size: 11px;
+          line-height: 1.1;
+          font-weight: 700;
+        }
+        
+        body.sss-print-safari .sss-print-activity-time {
+          margin-bottom: 3px;
+          font-size: 9px;
+          line-height: 1.12;
+        }
+        
+        body.sss-print-safari .sss-print-notes__body {
+          font-size: 9px;
+          line-height: 1.18;
+          display: -webkit-box;
+          -webkit-line-clamp: 20;
+          -webkit-box-orient: vertical;
+          overflow: visible;
+        }
+        
+        body.sss-print-safari .sss-print-footer {
+          margin-top: 6px;
+          padding-top: 4px;
+          font-size: 8px;
+        }
+        
+        body.sss-print-mobile-safari .sss-print-header {
+          grid-template-columns: 60px 1fr 78px;
+          gap: 4px;
+          margin-bottom: 4px;
+        }
+
+        body.sss-print-mobile-safari .sss-print-logo {
+          height: 40px;
+        }
+
+        body.sss-print-mobile-safari .sss-print-title {
+          font-size: 16px;
+        }
+
+        body.sss-print-mobile-safari .sss-print-subtitle {
+          font-size: 7px;
+          margin-top: 1px;
+        }
+
+        body.sss-print-mobile-safari .sss-print-meta {
+          gap: 2px;
+          margin-bottom: 4px;
+        }
+
+        body.sss-print-mobile-safari .sss-print-field-label {
+          font-size: 6.5px;
+          margin-bottom: 1px;
+        }
+
+        body.sss-print-mobile-safari .sss-print-field-value {
+          min-height: 12px;
+          padding: 2px 3px;
+          font-size: 7px;
+        }
+
+        body.sss-print-mobile-safari .sss-print-activities {
+          gap: 2px;
+          margin-top: 1px;
+        }
+
+        body.sss-print-mobile-safari .sss-print-row {
+          grid-template-columns: 45% 55%;
+          gap: 2px;
+          padding: 2px;
+          border-radius: 7px;
+        }
+
+        body.sss-print-mobile-safari .sss-print-visual {
+          height: 180px;
+          min-height: 180px;
+        }
+
+        body.sss-print-mobile-safari .sss-print-visual img {
+          max-width: 100%;
+          max-height: 100%;
+        }
+
+        body.sss-print-mobile-safari .sss-print-activity-title {
+          margin-bottom: 1px;
+          font-size: 7.8px;
+        }
+
+        body.sss-print-mobile-safari .sss-print-activity-time {
+          margin-bottom: 1px;
+          font-size: 6.8px;
+        }
+
+        body.sss-print-mobile-safari .sss-print-notes__body {
+          font-size: 6.4px;
+          line-height: 1.04;
+          display: -webkit-box;
+          -webkit-line-clamp: 20;
+          -webkit-box-orient: vertical;
+          overflow: visible;
+        }
+
+        body.sss-print-mobile-safari .sss-print-footer {
+          margin-top: 0;
+          padding-top: 1px;
+          font-size: 5.8px;
+        }
+
+        body.sss-print-mobile-safari .sss-print-page--4 .sss-print-activities {
+          gap: 1px;
+          margin-top: 0;
+        }
+
+        body.sss-print-mobile-safari .sss-print-page--4 .sss-print-row {
+          gap: 1px;
+          padding: 1px;
+        }
+
+        body.sss-print-mobile-safari .sss-print-page--4 .sss-print-visual {
+          height: 180px;
+          min-height: 180px;
+        }
+
+        body.sss-print-mobile-safari .sss-print-page--4 .sss-print-notes__body {
+          font-size: 6.1px;
+          line-height: 1.02;
+          -webkit-line-clamp: 20;
+        }
+
+        body.sss-print-mobile-safari .sss-print-page--4 .sss-print-footer {
+          margin-top: 0;
+          padding-top: 1px;
+          font-size: 5.5px;
         }
       </style>
     </head>
-    <body>
+    <body class="${[isSafariPrint ? 'sss-print-safari' : '', isMobileSafariPrint ? 'sss-print-mobile-safari' : ''].filter(Boolean).join(' ')}">
       ${pagesHtml}
     </body>
     </html>
   `);
   printWindow.document.close();
-
   printWindow.onload = function() {
-    setTimeout(function() {
-      printWindow.focus();
-      printWindow.print();
-    }, 300);
+    const firePrint = function() {
+      setTimeout(function() {
+        printWindow.focus();
+        printWindow.print();
+      }, 300);
+    };
+    try {
+      const doc = printWindow.document;
+      const imagePromises = Array.from(doc.images || []).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(resolve => {
+          const done = () => resolve();
+          img.addEventListener('load', done, { once: true });
+          img.addEventListener('error', done, { once: true });
+        });
+      });
+      const fontsReady = doc.fonts && doc.fonts.ready ? doc.fonts.ready.catch(() => {}) : Promise.resolve();
+      Promise.all([fontsReady].concat(imagePromises)).then(() => {
+        if (isSafariPrint && printWindow.requestAnimationFrame) {
+          printWindow.requestAnimationFrame(() => {
+            printWindow.requestAnimationFrame(firePrint);
+          });
+        } else {
+          firePrint();
+        }
+      });
+    } catch (e) {
+      firePrint();
+    }
   };
 }
+
 
         (async function init() {
       setStatusHero('Loading session…', '', true);
