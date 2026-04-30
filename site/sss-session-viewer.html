@@ -525,7 +525,7 @@ This material is proprietary and may not be reproduced or distributed without ex
     ];
 
     const DRILL_CACHE_KEY = "sss_drills_cache_v2";
-    const DRILL_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+    const DRILL_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
     let DRILLS = [];
     let DRILL_BY_ID = new Map();
@@ -1552,53 +1552,71 @@ function downloadPdfFromPlan(plan) {
     }
   };
 }
+function planNeedsDrillLibrary(plan) {
+  const rows = Array.isArray(plan && plan.rows) ? plan.rows : [];
+  if (!rows.length) return false;
 
+  return rows.some(row => {
+    const hasName  = !!String(row.drillName || "").trim();
+    const hasImage = !!String(row.imageUrl || "").trim();
+    const hasVideo = !!String(row.videoUrl || "").trim();
+    const hasPdf   = !!String(row.pdfUrl || "").trim();
+    return !(hasName && (hasImage || hasVideo || hasPdf));
+  });
+}
 
         (async function init() {
-      setStatusHero('Loading session…', '', true);
+  setStatusHero('Loading session…', '', true);
 
-      const sessionId = getSharedSessionIdFromUrl();
-      if (!sessionId) {
-        showViewerStatusOnly('No shared session ID was found in this link.', 'error');
-        return;
-      }
+  const sessionId = getSharedSessionIdFromUrl();
+  if (!sessionId) {
+    showViewerStatusOnly('No shared session ID was found in this link.', 'error');
+    return;
+  }
 
-      const sharedRes = await fetchSharedSessionById(sessionId);
-      if (!sharedRes || !sharedRes.ok || !sharedRes.session) {
-        showViewerStatusOnly((sharedRes && sharedRes.error) ? sharedRes.error : 'Could not load this shared session.', 'error');
-        return;
-      }
+  const sharedRes = await fetchSharedSessionById(sessionId);
+  if (!sharedRes || !sharedRes.ok || !sharedRes.session) {
+    showViewerStatusOnly(
+      (sharedRes && sharedRes.error) ? sharedRes.error : 'Could not load this shared session.',
+      'error'
+    );
+    return;
+  }
 
-      const plan = parseSharedSessionPayload(sharedRes.session);
-      if (!plan) {
-        showViewerStatusOnly('This shared session did not contain a valid payload.', 'error');
-        return;
-      }
+  const plan = parseSharedSessionPayload(sharedRes.session);
+  if (!plan) {
+    showViewerStatusOnly('This shared session did not contain a valid payload.', 'error');
+    return;
+  }
 
-      currentPlan = plan;
-      showExpiryOnPage(plan);
-      setStatusHero('Loading session activities…', '', true);
+  currentPlan = plan;
+  showExpiryOnPage(plan);
 
-      let drillLibraryLoaded = false;
-      try {
-        await loadDrillsViaJSONP();
-        drillLibraryLoaded = true;
-        console.log('Loaded drills:', DRILLS.length);
-      } catch (e) {
-        console.error(e);
-      }
+  const expired = isPlanExpired(plan);
+  if (expired) {
+    showExpiredState(plan);
+    return;
+  }
 
-      const expired = isPlanExpired(plan);
-      if (expired) {
-        showExpiredState(plan);
-      } else if (drillLibraryLoaded) {
-        renderSession(plan);
-      } else {
-        setStatusHero('Showing saved session without drill media.', 'error', false);
-        renderSession(plan, { keepStatusHero:true });
-      }
+  // Render immediately from the shared payload first
+  setStatusHero('Loading session activities…', '', true);
+  renderSession(plan);
 
-    })();
+  // Only fetch the drill library if something important is missing
+  if (!planNeedsDrillLibrary(plan)) {
+    return;
+  }
+
+  // Hydrate in the background
+  loadDrillsViaJSONP()
+    .then(() => {
+      console.log('Loaded drills:', DRILLS.length);
+      renderSession(plan);
+    })
+    .catch((e) => {
+      console.warn('Background drill hydrate failed:', e);
+    });
+})();
 
   </script>
 </body>
