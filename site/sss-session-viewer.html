@@ -1,1049 +1,520 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <link rel="preconnect" href="https://script.google.com">
-<link rel="preconnect" href="https://images.squarespace-cdn.com">
-<link rel="preconnect" href="https://drive.google.com">
-  
-  <meta charset="utf-8" />
-  <title>Soccer Skill Schools – Session Viewer</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    :root {
-      --ink:#020617;
-      --sub:#6b7280;
-      --border:#e5e7eb;
-      --bg:#f5f6f9;
-      --card:#ffffff;
-      --accent:#c83127;
-    }
-    * { box-sizing:border-box; }
-    body {
-      margin:0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-      background:var(--bg);
-      color:var(--ink);
-    }
-    .page {
-      max-width:980px;
-      margin:24px auto 32px;
-      padding:0 16px;
-    }
-    .session-card {
-      background:var(--card);
-      border-radius:18px;
-      box-shadow:0 18px 45px rgba(15,23,42,0.12);
-      padding:22px 22px 18px;
-      position:relative;
-    }
-    header.session-header {
-        display: grid;
-        grid-template-columns: 1fr auto 1fr; /* left | center | right */
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 12px;
-    }
-    .session-brand {
-      font-weight:700;
-      letter-spacing:.11em;
-      font-size:11px;
-      text-transform:uppercase;
+<script>
+  // ===== Drill library (must match the IDs used in Squarespace planner) =====
+  const COMMON_IMAGE_URL = "https://images.squarespace-cdn.com/content/68c441422ebffe2e9bfd31ed/478d1f90-f662-475b-8a8d-0c21f856080d/Wide+Area+3+v+2+Half+Field+Game.jpg?content-type=image%2Fjpeg";
+  const COMMON_VIDEO_URL = "https://drive.google.com/file/d/1X1EYi6gHGxeMwS69ID_ROCZYJoQRSMki/preview";
+  const COMMON_PDF_URL   = "https://drive.google.com/file/d/1oudhsehdchdQSMV67dAs7EYXOJkOTon_/preview";
+
+  const STATUS_HERO_DEFAULT_LOGO = "https://images.squarespace-cdn.com/content/68c441422ebffe2e9bfd31ed/a323dcda-562c-4f58-a955-c26cc0207bed/ISS-Logo.png?content-type=image%2Fpng";
+
+  // =========================================================
+  // DRILLS LIBRARY (Loaded from Google Sheets via Apps Script)
+  // =========================================================
+  const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxrwNK2By1uS8_EiX6Sx9tZ4Mpi4P0Z2JWA2H8tkE0Wl-87wakJDkK8ONiTujccHK5PxA/exec";
+
+  // Match the planner tab names exactly
+  const TAB_NAMES = [
+    "Attacking",
+    "Quarter/Three Quarter Turns",
+    "Change of Direction",
+    "Fake Change of Direction"
+  ];
+
+  const DRILL_CACHE_KEY = "sss_drills_cache_v2";
+  const DRILL_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+  const SHARED_SESSION_CACHE_PREFIX = "sss_shared_session_v1:";
+  const SHARED_SESSION_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+  const MAX_PDF_ACTIVITIES = 15;
+  const MAX_PDF_ACTIVITIES_PER_PAGE = 4;
+
+  let DRILLS = [];
+  let DRILL_BY_ID = new Map();
+  let currentPlan = null;
+
+  function splitList(val) {
+    const raw = (val || "").toString().trim();
+    if (!raw) return [];
+
+    let parts = raw.split(/[,，;|•·\n\r\/]+/g).map(s => s.trim()).filter(Boolean);
+
+    if (parts.length === 1 && /\s{2,}/.test(raw)) {
+      parts = raw.split(/\s{2,}/g).map(s => s.trim()).filter(Boolean);
     }
 
-    /* Left + right header columns */
-.session-brand:first-child {
-  justify-self: center;
-}
-
-.session-brand:last-child {
-  justify-self: center;
-  text-align: center;
-}
-
-    .session-logo {
-      position:absolute;
-      top:16px;     /* adjust if needed */
-      left:20px;
-      height:125px;  /* viewer logo size */
-      width:auto;
-      display:block;
+    const seen = new Set();
+    const out = [];
+    for (const p of parts) {
+      const key = p.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(p);
     }
-
-    @media print {
-      .session-logo {
-        height:40px;
-      }
-}
-
-
-    .session-title-wrap {
-      justify-self: center;
-    text-align: center;
-    max-width: 560px;
-    }
-    .session-title {
-      margin:0;
-      font-size:18px;
-      font-weight:650;
-    }
-    .session-subtitle {
-      margin:3px 0 0;
-      font-size:11px;
-      color:var(--sub);
-    }
-    .tag-readonly {
-      color:#b91c1c;
-      font-weight:600;
-    }
-
-    .session-actions {
-      display:flex;
-      justify-content:flex-end;
-      margin-bottom:6px;
-      gap:8px;
-      flex-wrap:wrap;
-    }
-
-    .btn {
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      padding:6px 12px;
-      border-radius:999px;
-      border:1px solid transparent;
-      font-size:11px;
-      font-weight:600;
-      cursor:pointer;
-      background:#111827;
-      color:#ffffff;
-      box-shadow:0 6px 16px rgba(15,23,42,0.16);
-      text-decoration:none;
-      gap:6px;
-    }
-    .btn--ghost {
-      background:#ffffff;
-      color:#111827;
-      border-color:var(--border);
-      box-shadow:none;
-    }
-    .btn:hover {
-      transform:translateY(-1px);
-      box-shadow:0 10px 22px rgba(15,23,42,0.2);
-    }
-    .btn--ghost:hover {
-      box-shadow:none;
-      background:#f9fafb;
-    }
-
-    .session-meta {
-      display:grid;
-      grid-template-columns:repeat(4,minmax(0,1fr));
-      gap:8px;
-      margin:10px 0 12px;
-      font-size:11px;
-    }
-    .meta-label {
-      text-transform:uppercase;
-      letter-spacing:.08em;
-      color:#4b5563;
-      margin-bottom:2px;
-      font-weight:600;
-    }
-    .meta-value {
-      border-radius:8px;
-      border:1px solid var(--border);
-      padding:4px 6px;
-      min-height:20px;
-      font-size:11px;
-    }
-
-    .activities-label {
-      font-size:11px;
-      text-transform:uppercase;
-      letter-spacing:.14em;
-      color:#9ca3af;
-      margin:4px 0 8px;
-      font-weight:600;
-    }
-
-    .activity-list {
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-      font-size:12px;
-    }
-    .activity-list.is-loading {
-      min-height: 150px;
-    }
-
-    .activity-row {
-      display:grid;
-      grid-template-columns:40% 60%;
-      gap:8px;
-      border-radius:12px;
-      border:1px solid var(--border);
-      padding:8px;
-      background:#ffffff;
-    }
-    .activity-visual {
-      cursor:pointer;
-    }
-    .activity-visual-inner {
-      display:block;
-      border-radius:8px;
-      overflow:hidden;
-      background:#020617;
-      position:relative;
-    }
-    .activity-visual-inner img {
-      display:block;
-      width:100%;
-      height:auto;
-      object-fit:contain;
-    }
-    .activity-visual-hint {
-      position:absolute;
-      left:8px;
-      right:8px;
-      bottom:6px;
-      border-radius:999px;
-      padding:3px 8px;
-      background:rgba(0,0,0,.75);
-      color:#f9fafb;
-      font-size:10px;
-      text-align:center;
-      pointer-events:none;
-    }
-
-    .activity-notes h3 {
-      margin:0 0 3px;
-      font-size:12px;
-      font-weight:650;
-    }
-    .activity-time {
-      margin:0 0 3px;
-      font-size:11px;
-    }
-    .activity-notes p {
-      margin:0 0 3px;
-      line-height:1.45;
-      font-size:11px;
-    }
-    .activity-links {
-      margin-top:4px;
-      display:flex;
-      flex-wrap:wrap;
-      gap:6px;
-      font-size:11px;
-    }
-    .activity-links a {
-      color:var(--accent);
-      text-decoration:none;
-    }
-    .activity-links a:hover {
-      text-decoration:underline;
-    }
-
-
-    @keyframes sssLogoScale {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.12); }
-    }
-    .session-status-hero {
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      justify-content:center;
-      gap:12px;
-      width:100%;
-      padding:6px 0 8px;
-      margin:0;
-      text-align:center;
-    }
-    .session-status-hero[hidden] { display:none !important; }
-    .session-status-hero__logo {
-      width:96px;
-      max-width:35vw;
-      height:auto;
-      display:block;
-      transform-origin:center center;
-      will-change:transform;
-    }
-    .session-status-hero__logo.is-animating {
-      animation:sssLogoScale 1.7s ease-in-out infinite;
-    }
-    .session-status-hero__text {
-      font-size:14px;
-      line-height:1.45;
-      font-weight:700;
-      color:var(--ink);
-      max-width:440px;
-      margin:0 auto;
-    }
-    .session-status-hero.is-error .session-status-hero__text { color:#b91c1c; }
-    .session-status-hero.is-ok .session-status-hero__text { color:#166534; }
-
-    .empty-message {
-      font-size:13px;
-      color:var(--sub);
-      padding:10px 0 4px;
-    }
-
-    .session-footer {
-      margin-top:12px;
-      padding-top:6px;
-      border-top:1px solid var(--border);
-      display:flex;
-      justify-content:space-between;
-      gap:8px;
-      font-size:10px;
-      color:#9ca3af;
-      flex-wrap:wrap;
-    }
-    .session-footer a {
-      color:var(--accent);
-      text-decoration:none;
-    }
-    .session-footer a:hover { text-decoration:underline; }
-
-    /* Video modal */
-    .modal-backdrop {
-      position:fixed;
-      inset:0;
-      background:rgba(15,23,42,0.7);
-      display:none;
-      align-items:center;
-      justify-content:center;
-      padding:24px 16px;
-      z-index:9999;
-    }
-    .modal-backdrop.is-visible { display:flex; }
-    .video-modal {
-      max-width:900px;
-      width:100%;
-      background:#020617;
-      border-radius:16px;
-      box-shadow:0 24px 60px rgba(0,0,0,0.65);
-      padding:10px 12px 14px;
-      color:#f9fafb;
-    }
-    .video-modal-header {
-      display:flex;
-      justify-content:flex-end;
-      margin-bottom:6px;
-    }
-    .video-close {
-      border:none;
-      background:transparent;
-      color:#e5e7eb;
-      font-size:18px;
-      cursor:pointer;
-    }
-    .video-frame-wrap {
-      position:relative;
-      padding-top:56.25%;
-      border-radius:12px;
-      overflow:hidden;
-      background:#000;
-    }
-    .video-frame-wrap iframe {
-      position:absolute;
-      inset:0;
-      width:100%;
-      height:100%;
-      border:0;
-      display:block;
-    }
-
-  /* =========================================================
-   MOBILE LAYOUT (STACKED + CENTERED)
-   - Fix absolute logo overlap by making it static on mobile
-   - Center the Download PDF button
-   - Hide the right "Session Plan" label on mobile
-   ========================================================= */
-@media (max-width: 900px) {
-
-  /* 1-column stacked header */
-  header.session-header{
-    display: grid;
-    grid-template-columns: 1fr;
-    justify-items: center;
-    text-align: center;
-    margin-bottom: 12px;
+    return out;
   }
 
-  .session-title-wrap{
-    text-align: center;
-    max-width: 100%;
+  function slugify(str) {
+    return (str || "")
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-");
   }
 
-  /* Make logo participate in layout (so it stacks above title) */
-  .session-logo{
-    position: static;
-    height: 90px;          /* smaller logo on mobile */
-    margin: 0 auto 8px;    /* center it + add spacing */
-    display: block;
+  function mapSheetRowsToDrills(rows) {
+    const toTags = (val) => splitList(val);
+
+    return (rows || []).map(r => {
+      const name = r["Name"] || "";
+      const id = r["ID"] || slugify(name);
+
+      return {
+        id,
+        name,
+        folder: r.__sheet || "",
+        theme: r["Theme"] || "",
+        category: r["Category"] || "",
+        categoryRaw: r["Category"] || "",
+        categories: splitList(r["Category"]),
+        duration: r["Duration"] || "",
+        tags: toTags(r["Tags"]),
+        defaultNotes: r["Default Notes"] || "",
+        imageUrl: r["Image URL (Squarespace)"] || "",
+        driveImagePreviewUrl: r["Drive Image Preview URL"] || "",
+        videoUrl: r["Video URL"] || "",
+        pdfUrl: r["PDF URL"] || ""
+      };
+    }).filter(d => d.name);
   }
 
-  /* Hide the right-side label */
-  .session-brand:last-child{
-    display: none;
-  }
-
-  /* Center the Download PDF button */
-  .session-actions{
-    justify-content: center;
-  }
-
-  .session-status-hero{
-    padding: 6px 4px 8px;
-  }
-  .session-status-hero__logo{
-    width: 82px;
-    max-width: 42vw;
-  }
-  .session-status-hero__text{
-    font-size: 13px;
-    max-width: 300px;
-  }
-
-  /* Your existing responsive behavior */
-  .activity-row{
-    grid-template-columns: minmax(0,1fr);
-  }
-  .session-meta{
-    grid-template-columns: repeat(2, minmax(0,1fr));
-  }
-}
-
-
-  </style>
-</head>
-<body>
-  <main class="page">
-    <section class="session-card" id="session-viewer">
-      <header class="session-header">
-        <div class="session-brand">
-          
-        <img
-              src="https://images.squarespace-cdn.com/content/68c441422ebffe2e9bfd31ed/a323dcda-562c-4f58-a955-c26cc0207bed/ISS-Logo.png?content-type=image%2Fpng"
-              alt="Illinois Skill Schools logo"
-              class="session-logo">
-
-        </div>
-        <div class="session-title-wrap">
-          <h1 class="session-title">Interactive Session Plan</h1>
-          <p class="session-subtitle">
-            Read-only view shared from the Soccer Skill Schools session planner.
-          </p>
-          <p class="session-subtitle tag-readonly">
-            Shared link – this session cannot be edited here.
-          </p>
-          <p class="session-subtitle" id="expiry-display" style="display:none;"></p>
-
-        </div>
-        <div class="session-brand" style="text-align:right;">Session Plan</div>
-      </header>
-
-           <div class="session-actions">
-        <button type="button" class="btn" id="download-pdf-btn">
-          Download PDF
-        </button>
-      </div>
-
-      <!-- NEW: shows when the shared link is expired -->
-      <p class="empty-message" id="expired-message" style="display:none;color:#b91c1c;">
-        This shared session link has expired. Please contact your coach for a new link.
-      </p>
-
-      <div class="session-meta">
-        <div>
-          <div class="meta-label">Date</div>
-          <div class="meta-value" id="meta-date"></div>
-        </div>
-        <div>
-          <div class="meta-label">Skills</div>
-          <div class="meta-value" id="meta-coach"></div>
-        </div>
-        <div>
-          <div class="meta-label">Age group</div>
-          <div class="meta-value" id="meta-age"></div>
-        </div>
-        <div>
-          <div class="meta-label">Session theme</div>
-          <div class="meta-value" id="meta-theme"></div>
-        </div>
-      </div>
-
-      <div class="activities-label">Session activities</div>
-      <div class="activity-list is-loading" id="activity-list">
-        <div class="session-status-hero" id="session-status-hero" aria-live="polite">
-          <img
-            src="https://images.squarespace-cdn.com/content/68c441422ebffe2e9bfd31ed/a323dcda-562c-4f58-a955-c26cc0207bed/ISS-Logo.png?content-type=image%2Fpng"
-            alt="Illinois Skill Schools logo"
-            class="session-status-hero__logo is-animating"
-            id="session-status-hero-logo">
-          <div class="session-status-hero__text" id="session-status-hero-text">Loading session…</div>
-        </div>
-      </div>
-
-      <footer class="session-footer">
-        <span>© 2016 Soccer Skill Schools. All rights reserved.
-This material is proprietary and may not be reproduced or distributed without express written permission.</span>
-      </footer>
-    </section>
-  </main>
-
-  <!-- Video popup -->
-  <div class="modal-backdrop" id="video-modal">
-    <div class="video-modal">
-      <div class="video-modal-header">
-        <button type="button" class="video-close" id="video-close" aria-label="Close video">×</button>
-      </div>
-      <div class="video-frame-wrap">
-        <iframe id="video-iframe" src=""
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowfullscreen></iframe>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    // ===== Drill library (must match the IDs used in Squarespace planner) =====
-    const COMMON_IMAGE_URL = "https://images.squarespace-cdn.com/content/68c441422ebffe2e9bfd31ed/478d1f90-f662-475b-8a8d-0c21f856080d/Wide+Area+3+v+2+Half+Field+Game.jpg?content-type=image%2Fjpeg";
-    const COMMON_VIDEO_URL = "https://drive.google.com/file/d/1X1EYi6gHGxeMwS69ID_ROCZYJoQRSMki/preview";
-    const COMMON_PDF_URL   = "https://drive.google.com/file/d/1oudhsehdchdQSMV67dAs7EYXOJkOTon_/preview";
-
-    
-    // =========================================================
-    // DRILLS LIBRARY (Loaded from Google Sheets via Apps Script)
-    // =========================================================
-    const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxrwNK2By1uS8_EiX6Sx9tZ4Mpi4P0Z2JWA2H8tkE0Wl-87wakJDkK8ONiTujccHK5PxA/exec";
-
-    // Match the 03/09 planner tab names exactly
-    const TAB_NAMES = [
-      "Attacking",
-      "Quarter/Three Quarter Turns",
-      "Change of Direction",
-      "Fake Change of Direction"
-    ];
-
-    const DRILL_CACHE_KEY = "sss_drills_cache_v2";
-    const DRILL_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-
-    let DRILLS = [];
-    let DRILL_BY_ID = new Map();
-
-    function splitList(val) {
-      const raw = (val || "").toString().trim();
-      if (!raw) return [];
-
-      let parts = raw.split(/[,，;|•·\n\r\/]+/g).map(s => s.trim()).filter(Boolean);
-
-      if (parts.length === 1 && /\s{2,}/.test(raw)) {
-        parts = raw.split(/\s{2,}/g).map(s => s.trim()).filter(Boolean);
-      }
-
-      const seen = new Set();
-      const out = [];
-      for (const p of parts) {
-        const key = p.toLowerCase();
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push(p);
-      }
-      return out;
-    }
-
-    function slugify(str) {
-      return (str || "")
-        .toLowerCase()
-        .trim()
-        .replace(/[^\w\s-]/g, "")
-        .replace(/\s+/g, "-")
-        .replace(/-+/g, "-");
-    }
-
-    function mapSheetRowsToDrills(rows) {
-      const toTags = (val) => splitList(val);
-
-      return (rows || []).map(r => {
-        const name = r["Name"] || "";
-        const id = r["ID"] || slugify(name);
-
-        return {
-          id,
-          name,
-          folder: r.__sheet || "",
-          theme: r["Theme"] || "",
-          category: r["Category"] || "",
-          categoryRaw: r["Category"] || "",
-          categories: splitList(r["Category"]),
-          duration: r["Duration"] || "",
-          tags: toTags(r["Tags"]),
-          defaultNotes: r["Default Notes"] || "",
-          imageUrl: r["Image URL (Squarespace)"] || "",
-          driveImagePreviewUrl: r["Drive Image Preview URL"] || "",
-          videoUrl: r["Video URL"] || "",
-          pdfUrl: r["PDF URL"] || ""
-        };
-      }).filter(d => d.name);
-    }
-
-    function loadDrillsViaJSONP() {
-      return new Promise((resolve, reject) => {
-        if (!APPS_SCRIPT_WEBAPP_URL || APPS_SCRIPT_WEBAPP_URL.includes("PASTE_YOUR")) {
-          reject(new Error("Apps Script Web App URL not set."));
-          return;
-        }
-
-        try {
-          const cachedRaw = localStorage.getItem(DRILL_CACHE_KEY);
-          if (cachedRaw) {
-            const cached = JSON.parse(cachedRaw);
-            if (cached && Array.isArray(cached.rows) && (Date.now() - (cached.savedAt || cached.ts || 0) < DRILL_CACHE_TTL_MS)) {
-              DRILLS = mapSheetRowsToDrills(cached.rows);
-              DRILL_BY_ID = new Map(DRILLS.map(d => [d.id, d]));
-
-              // Quiet background refresh so new rows/tab changes still come through
-              jsonpFetch()
-                .then(rows => {
-                  try {
-                    localStorage.setItem(DRILL_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), ts: Date.now(), rows }));
-                  } catch (e) {}
-                })
-                .catch(() => {});
-
-              resolve(DRILLS);
-              return;
-            }
-          }
-        } catch (e) {}
-
-        jsonpFetch().then(rows => {
-          try {
-            localStorage.setItem(DRILL_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), ts: Date.now(), rows }));
-          } catch (e) {}
-
-          DRILLS = mapSheetRowsToDrills(rows);
-          DRILL_BY_ID = new Map(DRILLS.map(d => [d.id, d]));
-          resolve(DRILLS);
-        }).catch(reject);
-
-        function jsonpFetch() {
-          return new Promise((res, rej) => {
-            const cbName = "__sssDrillsCB_" + Math.random().toString(36).slice(2);
-            const script = document.createElement("script");
-
-            const cleanup = () => {
-              try { delete window[cbName]; } catch (e) {}
-              if (script && script.parentNode) script.parentNode.removeChild(script);
-            };
-
-            window[cbName] = (payload) => {
-              cleanup();
-
-              if (!payload) { rej(new Error("Empty response from Apps Script.")); return; }
-              if (Array.isArray(payload)) { res(payload); return; }
-              if (payload && Array.isArray(payload.rows)) { res(payload.rows); return; }
-              if (payload && Array.isArray(payload.data)) { res(payload.data); return; }
-
-              rej(new Error(payload && payload.error ? payload.error : "Unexpected response shape from Apps Script."));
-            };
-
-            const tabsParam = encodeURIComponent(TAB_NAMES.join(","));
-            script.src = APPS_SCRIPT_WEBAPP_URL + "?callback=" + cbName + "&tabs=" + tabsParam;
-            script.onerror = () => { cleanup(); rej(new Error("JSONP script failed to load.")); };
-
-            document.head.appendChild(script);
-          });
-        }
-      });
-    }
-
-
-    const MAX_PDF_ACTIVITIES = 15;
-    const MAX_PDF_ACTIVITIES_PER_PAGE = 4;
-
-    let currentPlan = null;
-
-    // Always attach the click handler (even if the link is missing/invalid).
-const pdfBtn = document.getElementById('download-pdf-btn');
-if (pdfBtn) {
-  pdfBtn.addEventListener('click', () => {
-    if (!currentPlan) {
-      alert('No shared session found to print. Please open a valid shared link from the planner.');
-      return;
-    }
-    if (isPlanExpired(currentPlan)) {
-      alert('This shared session link has expired. Please contact your coach for a new link.');
-      return;
-    }
-    downloadPdfFromPlan(currentPlan);
-  });
-}
-
-
-    // ===== Shared-session loading via Netlify proxy =====
-    const SESSIONS_PROXY_URL = "/.netlify/functions/sss-sessions";
-
-    function getSharedSessionIdFromUrl() {
-      try {
-        const params = new URLSearchParams(window.location.search);
-        return String(params.get('s') || '').trim();
-      } catch (e) {
-        console.error('getSharedSessionIdFromUrl error', e);
-        return '';
-      }
-    }
-
-    async function fetchSharedSessionById(sessionId) {
-      if (!sessionId) return { ok:false, error:'Missing session ID.' };
-
-      try {
-        const qs = new URLSearchParams({
-          fn: 'getSharedSession',
-          s: sessionId
-        }).toString();
-
-        const res = await fetch(SESSIONS_PROXY_URL + '?' + qs, {
-          method: 'GET',
-          cache: 'no-store',
-          credentials: 'omit'
-        });
-
-        const text = await res.text();
-        let data = null;
-
-        try {
-          data = text ? JSON.parse(text) : null;
-        } catch (parseErr) {
-          data = null;
-        }
-
-        if (!res.ok) {
-          return {
-            ok:false,
-            error:(data && data.error) ? data.error : (text || ('Request failed (' + res.status + ')'))
-          };
-        }
-
-        if (!data || !data.ok || !data.session) {
-          return {
-            ok:false,
-            error:(data && data.error) ? data.error : 'Shared session not found.'
-          };
-        }
-
-        return data;
-      } catch (e) {
-        console.error('fetchSharedSessionById error', e);
-        return {
-          ok:false,
-          error:(e && e.message) ? e.message : 'Could not load shared session.'
-        };
-      }
-    }
-
-    function parseSharedSessionPayload(session) {
-      try {
-        if (!session) return null;
-        if (typeof session.payload === 'string') return JSON.parse(session.payload);
-        if (session.payload && typeof session.payload === 'object') return session.payload;
-        return null;
-      } catch (e) {
-        console.error('parseSharedSessionPayload error', e);
-        return null;
-      }
-    }
-
-        function isPlanExpired(plan) {
-      if (!plan) return false;
-
-      try {
-        const now = new Date();
-        let expiry = null;
-
-        // Prefer explicit expiry from planner
-        if (plan.expiry) {
-          const e = new Date(plan.expiry);
-          if (!isNaN(e.getTime())) {
-            expiry = e;
-          }
-        }
-
-        // Fallback: generatedAt + 30 days
-        if (!expiry && plan.generatedAt) {
-          const g = new Date(plan.generatedAt);
-          if (!isNaN(g.getTime())) {
-            expiry = new Date(g.getTime() + 90 * 24 * 60 * 60 * 1000);
-          }
-        }
-
-        // Old links (no expiry / generatedAt) = never auto-expire
-        if (!expiry) return false;
-
-        return now > expiry;
-      } catch (err) {
-        console.error('isPlanExpired error', err);
-        return false;
-      }
-    }
-
-    function formatExpiryForDisplay(plan) {
-  if (!plan) return null;
-
-  // Prefer explicit expiry from planner
-  if (plan.expiry) {
-    const e = new Date(plan.expiry);
-    if (!isNaN(e.getTime())) return e;
-  }
-
-  // Fallback: generatedAt + 90 days (match your new rule)
-  if (plan.generatedAt) {
-    const g = new Date(plan.generatedAt);
-    if (!isNaN(g.getTime())) {
-      return new Date(g.getTime() + 90 * 24 * 60 * 60 * 1000);
-    }
-  }
-
-  return null;
-}
-
-function showExpiryOnPage(plan) {
-  const el = document.getElementById('expiry-display');
-  if (!el) return;
-
-  const expiryDate = formatExpiryForDisplay(plan);
-  if (!expiryDate) return;
-
-  // Example format: Jan 14, 2026
-  const pretty = expiryDate.toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  });
-
-  el.textContent = `Planner expires on ${pretty}`;
-  el.style.display = 'block';
-}
-
-
-    function setStatusHero(message, tone, animate) {
-      const hero = document.getElementById('session-status-hero');
-      const logo = document.getElementById('session-status-hero-logo');
-      const text = document.getElementById('session-status-hero-text');
-      const listEl = document.getElementById('activity-list');
-      if (!hero || !logo || !text) return;
-
-      if (listEl && hero.parentNode !== listEl) {
-        listEl.prepend(hero);
-      }
-      if (listEl) listEl.classList.add('is-loading');
-
-      hero.hidden = false;
-      hero.classList.remove('is-error', 'is-ok');
-      if (tone === 'error') hero.classList.add('is-error');
-      if (tone === 'ok') hero.classList.add('is-ok');
-
-      logo.classList.toggle('is-animating', !!animate);
-      text.textContent = message || '';
-    }
-
-    function hideStatusHero() {
-      const hero = document.getElementById('session-status-hero');
-      const listEl = document.getElementById('activity-list');
-      if (hero) hero.hidden = true;
-      if (listEl) listEl.classList.remove('is-loading');
-    }
-
-    function showViewerStatusOnly(message, tone) {
-      const listEl  = document.getElementById('activity-list');
-      const metaEl  = document.querySelector('.session-meta');
-      const labelEl = document.querySelector('.activities-label');
-      const pdfBtn  = document.getElementById('download-pdf-btn');
-      const expiredEl = document.getElementById('expired-message');
-
-      setStatusHero(message, tone || 'error', false);
-      if (listEl) {
-        listEl.classList.add('is-loading');
-        listEl.innerHTML = '';
-      }
-      if (metaEl) metaEl.style.display = 'none';
-      if (labelEl) labelEl.style.display = 'none';
-      if (expiredEl) expiredEl.style.display = 'none';
-      if (pdfBtn) pdfBtn.disabled = true;
-    }
-
-
-    function showExpiredState(plan) {
-      const expiredEl = document.getElementById('expired-message');
-      if (expiredEl) expiredEl.style.display = 'none';
-      showViewerStatusOnly('This shared session link has expired. Please contact your coach for a new link.', 'error');
-    }
-
-
-    // ===== Video modal controls =====
-    const videoModal  = document.getElementById('video-modal');
-    const videoFrame  = document.getElementById('video-iframe');
-    const videoClose  = document.getElementById('video-close');
-
-    function openVideo(url) {
-      if (!url) return;
-      videoFrame.src = url;
-      videoModal.classList.add('is-visible');
-    }
-    function closeVideo() {
-      videoFrame.src = '';
-      videoModal.classList.remove('is-visible');
-    }
-    videoClose.addEventListener('click', closeVideo);
-    videoModal.addEventListener('click', (e) => {
-      if (e.target === videoModal) closeVideo();
-    });
-
-    // ===== Render the shared session =====
-    function renderSession(plan, options) {
-      options = options || {};
-      const dateEl   = document.getElementById('meta-date');
-      const coachEl  = document.getElementById('meta-coach');
-      const ageEl    = document.getElementById('meta-age');
-      const themeEl  = document.getElementById('meta-theme');
-      const listEl   = document.getElementById('activity-list');
-
-      dateEl.textContent  = plan.date || '';
-      coachEl.textContent = plan.coach || '';
-      ageEl.textContent   = plan.ageGroup || '';
-      themeEl.textContent = plan.theme || '';
-
-      const rows = Array.isArray(plan.rows) ? plan.rows : [];
-      if (!rows.length) {
-        setStatusHero('No activities found in this shared session.', 'error', false);
-        listEl.innerHTML = '';
+  function loadDrillsViaJSONP() {
+    return new Promise((resolve, reject) => {
+      if (!APPS_SCRIPT_WEBAPP_URL || APPS_SCRIPT_WEBAPP_URL.includes("PASTE_YOUR")) {
+        reject(new Error("Apps Script Web App URL not set."));
         return;
       }
 
-      const hero = document.getElementById('session-status-hero');
-      if (!options.keepStatusHero) {
-        hideStatusHero();
-        listEl.innerHTML = '';
-      } else {
-        const preservedHero = hero && hero.parentNode === listEl ? hero : null;
-        listEl.innerHTML = '';
-        if (preservedHero) listEl.appendChild(preservedHero);
-      }
-      const pdfBtn = document.getElementById('download-pdf-btn');
-      if (pdfBtn) pdfBtn.disabled = false;
-      rows.forEach((row, index) => {
-        const drill = DRILL_BY_ID.get(row.drillId) || {};
-        const fallbackDrill = {
-          name: row.drillName || '',
-          imageUrl: row.imageUrl || '',
-          videoUrl: row.videoUrl || '',
-          pdfUrl: row.pdfUrl || '',
-          defaultNotes: row.defaultNotes || ''
-        };
-        const mergedDrill = Object.assign({}, fallbackDrill, drill || {});
-        const imgUrl   = mergedDrill.imageUrl || '';
-        const videoUrl = mergedDrill.videoUrl || '';
-        const pdfUrl   = mergedDrill.pdfUrl   || '';
-        const notes    = row.notes || mergedDrill.defaultNotes || '';
-        const time     = row.time || '';
+      try {
+        const cachedRaw = localStorage.getItem(DRILL_CACHE_KEY);
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw);
+          if (cached && Array.isArray(cached.rows) && (Date.now() - (cached.savedAt || cached.ts || 0) < DRILL_CACHE_TTL_MS)) {
+            DRILLS = mapSheetRowsToDrills(cached.rows);
+            DRILL_BY_ID = new Map(DRILLS.map(d => [d.id, d]));
 
-        const article = document.createElement('article');
-        article.className = 'activity-row';
+            // Quiet background refresh
+            jsonpFetch()
+              .then(rows => {
+                try {
+                  localStorage.setItem(DRILL_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), ts: Date.now(), rows }));
+                } catch (e) {}
+              })
+              .catch(() => {});
 
-        article.innerHTML = `
-          <div class="activity-visual">
-            <div class="activity-visual-inner">
-              ${
-                imgUrl
-                  ? `<img src="${imgUrl}" alt="${mergedDrill.name || 'Session diagram'}">`
-                  : `<div style="padding:18px;color:#e5e7eb;font-size:11px;text-align:center;">Session diagram</div>`
-              }
-              <div class="activity-visual-hint">
-                ${
-                  videoUrl
-                    ? 'Click to watch demo video'
-                    : (pdfUrl ? 'Click to open session PDF' : 'Click to open game resources')
-                }
-              </div>
-            </div>
-          </div>
-          <div class="activity-notes">
-            <h3>${index + 1}. ${mergedDrill.name || 'Activity'}</h3>
-            ${time ? `<p class="activity-time"><strong>Time:</strong> ${time}</p>` : ''}
-            ${
-              notes
-                ? `<p>${notes.replace(/\n/g,'<br>')}</p>`
-                : ''
-            }
-            <div class="activity-links">
-              ${pdfUrl ? `<a href="${pdfUrl}" target="_blank" rel="noopener">Session PDF</a>` : ''}
-              ${videoUrl ? `<a href="${videoUrl}" target="_blank" rel="noopener">Video (open in new tab)</a>` : ''}
-            </div>
-          </div>
-        `;
-
-        const visual = article.querySelector('.activity-visual-inner');
-        visual.addEventListener('click', () => {
-          if (videoUrl) {
-            openVideo(videoUrl);
-          } else if (pdfUrl) {
-            window.open(pdfUrl, '_blank');
+            resolve(DRILLS);
+            return;
           }
+        }
+      } catch (e) {}
+
+      jsonpFetch().then(rows => {
+        try {
+          localStorage.setItem(DRILL_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), ts: Date.now(), rows }));
+        } catch (e) {}
+
+        DRILLS = mapSheetRowsToDrills(rows);
+        DRILL_BY_ID = new Map(DRILLS.map(d => [d.id, d]));
+        resolve(DRILLS);
+      }).catch(reject);
+
+      function jsonpFetch() {
+        return new Promise((res, rej) => {
+          const cbName = "__sssDrillsCB_" + Math.random().toString(36).slice(2);
+          const script = document.createElement("script");
+
+          const cleanup = () => {
+            try { delete window[cbName]; } catch (e) {}
+            if (script && script.parentNode) script.parentNode.removeChild(script);
+          };
+
+          window[cbName] = (payload) => {
+            cleanup();
+
+            if (!payload) { rej(new Error("Empty response from Apps Script.")); return; }
+            if (Array.isArray(payload)) { res(payload); return; }
+            if (payload && Array.isArray(payload.rows)) { res(payload.rows); return; }
+            if (payload && Array.isArray(payload.data)) { res(payload.data); return; }
+
+            rej(new Error(payload && payload.error ? payload.error : "Unexpected response shape from Apps Script."));
+          };
+
+          const tabsParam = encodeURIComponent(TAB_NAMES.join(","));
+          script.src = APPS_SCRIPT_WEBAPP_URL + "?callback=" + cbName + "&tabs=" + tabsParam;
+          script.onerror = () => { cleanup(); rej(new Error("JSONP script failed to load.")); };
+
+          document.head.appendChild(script);
         });
+      }
+    });
+  }
 
-        listEl.appendChild(article);
+  // Always attach the click handler (even if the link is missing/invalid).
+  const pdfBtn = document.getElementById('download-pdf-btn');
+  if (pdfBtn) {
+    pdfBtn.addEventListener('click', () => {
+      if (!currentPlan) {
+        alert('No shared session found to print. Please open a valid shared link from the planner.');
+        return;
+      }
+      if (isPlanExpired(currentPlan)) {
+        alert('This shared session link has expired. Please contact your coach for a new link.');
+        return;
+      }
+      downloadPdfFromPlan(currentPlan);
+    });
+  }
+
+  // ===== Shared-session loading via Netlify proxy =====
+  const SESSIONS_PROXY_URL = "/.netlify/functions/sss-sessions";
+
+  function getSharedSessionIdFromUrl() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return String(params.get('s') || '').trim();
+    } catch (e) {
+      console.error('getSharedSessionIdFromUrl error', e);
+      return '';
+    }
+  }
+
+  function getSharedSessionCacheKey(sessionId) {
+    return SHARED_SESSION_CACHE_PREFIX + String(sessionId || "").trim();
+  }
+
+  function readCachedSharedSession(sessionId) {
+    try {
+      const raw = localStorage.getItem(getSharedSessionCacheKey(sessionId));
+      if (!raw) return null;
+
+      const parsed = JSON.parse(raw);
+      if (!parsed || !parsed.savedAt || !parsed.session) return null;
+
+      if (Date.now() - parsed.savedAt > SHARED_SESSION_CACHE_TTL_MS) return null;
+
+      return parsed.session;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function writeCachedSharedSession(sessionId, session) {
+    try {
+      localStorage.setItem(
+        getSharedSessionCacheKey(sessionId),
+        JSON.stringify({
+          savedAt: Date.now(),
+          session: session
+        })
+      );
+    } catch (e) {}
+  }
+
+  async function fetchSharedSessionById(sessionId) {
+    if (!sessionId) return { ok:false, error:'Missing session ID.' };
+
+    try {
+      const qs = new URLSearchParams({
+        fn: 'getSharedSession',
+        s: sessionId
+      }).toString();
+
+      const res = await fetch(SESSIONS_PROXY_URL + '?' + qs, {
+        method: 'GET',
+        cache: 'default',
+        credentials: 'omit'
       });
+
+      const text = await res.text();
+      let data = null;
+
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch (parseErr) {
+        data = null;
+      }
+
+      if (!res.ok) {
+        return {
+          ok:false,
+          error:(data && data.error) ? data.error : (text || ('Request failed (' + res.status + ')'))
+        };
+      }
+
+      if (!data || !data.ok || !data.session) {
+        return {
+          ok:false,
+          error:(data && data.error) ? data.error : 'Shared session not found.'
+        };
+      }
+
+      writeCachedSharedSession(sessionId, data.session);
+      return data;
+    } catch (e) {
+      console.error('fetchSharedSessionById error', e);
+      return {
+        ok:false,
+        error:(e && e.message) ? e.message : 'Could not load shared session.'
+      };
+    }
+  }
+
+  function parseSharedSessionPayload(session) {
+    try {
+      if (!session) return null;
+      if (typeof session.payload === 'string') return JSON.parse(session.payload);
+      if (session.payload && typeof session.payload === 'object') return session.payload;
+      return null;
+    } catch (e) {
+      console.error('parseSharedSessionPayload error', e);
+      return null;
+    }
+  }
+
+  function isPlanExpired(plan) {
+    if (!plan) return false;
+
+    try {
+      const now = new Date();
+      let expiry = null;
+
+      // Prefer explicit expiry from planner
+      if (plan.expiry) {
+        const e = new Date(plan.expiry);
+        if (!isNaN(e.getTime())) {
+          expiry = e;
+        }
+      }
+
+      // Fallback: generatedAt + 90 days
+      if (!expiry && plan.generatedAt) {
+        const g = new Date(plan.generatedAt);
+        if (!isNaN(g.getTime())) {
+          expiry = new Date(g.getTime() + 90 * 24 * 60 * 60 * 1000);
+        }
+      }
+
+      if (!expiry) return false;
+      return now > expiry;
+    } catch (err) {
+      console.error('isPlanExpired error', err);
+      return false;
+    }
+  }
+
+  function formatExpiryForDisplay(plan) {
+    if (!plan) return null;
+
+    if (plan.expiry) {
+      const e = new Date(plan.expiry);
+      if (!isNaN(e.getTime())) return e;
     }
 
-    // ===== PDF generation from shared plan =====
-   
-function downloadPdfFromPlan(plan) {
-  const rows = Array.isArray(plan.rows) ? plan.rows : [];
-  const selectedRows = rows.filter(r => !!r.drillId);
-
-  if (!selectedRows.length) {
-    alert('This shared session has no games to print.');
-    return;
-  }
-  if (selectedRows.length > MAX_PDF_ACTIVITIES) {
-    alert('This shared session contains more than ' + MAX_PDF_ACTIVITIES + ' games. Please reduce the number in the planner.');
-    return;
-  }
-
-  const dateVal  = plan.date || '';
-  const coachVal = plan.coach || '';
-  const ageVal   = plan.ageGroup || '';
-  const themeVal = plan.theme || '';
-  const isSafariPrint = /^((?!chrome|android|crios|fxios|edgios).)*safari/i.test(navigator.userAgent || '');
-  const isMobileSafariPrint = /iP(?:hone|ad|od)/i.test(navigator.userAgent || '') && isSafariPrint;
-  const MAX_PER_PAGE = MAX_PDF_ACTIVITIES_PER_PAGE;
-  const esc = (value) => String(value == null ? '' : value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-  const nl2br = (value) => esc(value).replace(/\n/g, '<br>');
-
-  const pages = [];
-  for (let i = 0; i < selectedRows.length; i += MAX_PER_PAGE) {
-    pages.push(selectedRows.slice(i, i + MAX_PER_PAGE));
-  }
-
-  const pagesHtml = pages.map((pageRows, pageIndex) => {
-    const rowsPerPage = pageRows.length;
-    let minHeightPx = rowsPerPage >= 4 ? 210 : 250;
-    if (isSafariPrint) {
-      minHeightPx = rowsPerPage >= 4 ? 205 : 245;
-    }
-    if (isMobileSafariPrint) {
-      minHeightPx = rowsPerPage >= 4 ? 190 : 230;
+    if (plan.generatedAt) {
+      const g = new Date(plan.generatedAt);
+      if (!isNaN(g.getTime())) {
+        return new Date(g.getTime() + 90 * 24 * 60 * 60 * 1000);
+      }
     }
 
-    const activitiesHtml = pageRows.map((row, idxOnPage) => {
-      const globalIndex = pageIndex * MAX_PER_PAGE + idxOnPage + 1;
+    return null;
+  }
+
+  function showExpiryOnPage(plan) {
+    const el = document.getElementById('expiry-display');
+    if (!el) return;
+
+    const expiryDate = formatExpiryForDisplay(plan);
+    if (!expiryDate) {
+      el.style.display = 'none';
+      return;
+    }
+
+    const pretty = expiryDate.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+
+    el.textContent = `Planner expires on ${pretty}`;
+    el.style.display = 'block';
+  }
+
+  function resetStatusHeroLogo() {
+    const logo = document.getElementById('session-status-hero-logo');
+    if (!logo) return;
+
+    logo.src = STATUS_HERO_DEFAULT_LOGO;
+    logo.alt = 'Illinois Skill Schools logo';
+    logo.classList.add('is-animating');
+    logo.style.width = '';
+    logo.style.maxWidth = '';
+    logo.style.borderRadius = '';
+    logo.style.border = '';
+    logo.style.display = '';
+    logo.style.margin = '';
+    logo.style.height = '';
+    logo.style.objectFit = '';
+  }
+
+  function setStatusHero(message, tone, animate) {
+    const hero = document.getElementById('session-status-hero');
+    const logo = document.getElementById('session-status-hero-logo');
+    const text = document.getElementById('session-status-hero-text');
+    const listEl = document.getElementById('activity-list');
+    if (!hero || !logo || !text || !listEl) return;
+
+    if (hero.parentNode !== listEl) {
+      listEl.prepend(hero);
+    }
+    listEl.classList.add('is-loading');
+
+    hero.hidden = false;
+    hero.classList.remove('is-error', 'is-ok');
+    if (tone === 'error') hero.classList.add('is-error');
+    if (tone === 'ok') hero.classList.add('is-ok');
+
+    resetStatusHeroLogo();
+    logo.classList.toggle('is-animating', !!animate);
+    text.textContent = message || '';
+  }
+
+  function hideStatusHero() {
+    const hero = document.getElementById('session-status-hero');
+    const listEl = document.getElementById('activity-list');
+    if (hero) hero.hidden = true;
+    if (listEl) listEl.classList.remove('is-loading');
+    resetStatusHeroLogo();
+  }
+
+  function showThumbPreview(plan) {
+    const hero = document.getElementById('session-status-hero');
+    const logo = document.getElementById('session-status-hero-logo');
+    const text = document.getElementById('session-status-hero-text');
+    const listEl = document.getElementById('activity-list');
+
+    if (!plan || !plan.__thumb || !hero || !logo || !text || !listEl) return;
+
+    if (hero.parentNode !== listEl) {
+      listEl.prepend(hero);
+    }
+    listEl.classList.add('is-loading');
+
+    hero.hidden = false;
+    hero.classList.remove('is-error', 'is-ok');
+
+    logo.classList.remove('is-animating');
+    logo.src = plan.__thumb;
+    logo.alt = 'Session preview';
+    logo.style.width = '100%';
+    logo.style.maxWidth = '520px';
+    logo.style.borderRadius = '14px';
+    logo.style.border = '1px solid #e5e7eb';
+    logo.style.display = 'block';
+    logo.style.margin = '0 auto 8px';
+    logo.style.height = 'auto';
+    logo.style.objectFit = 'contain';
+
+    text.textContent = 'Loading session…';
+  }
+
+  function showViewerStatusOnly(message, tone) {
+    const listEl  = document.getElementById('activity-list');
+    const metaEl  = document.querySelector('.session-meta');
+    const labelEl = document.querySelector('.activities-label');
+    const pdfBtn  = document.getElementById('download-pdf-btn');
+    const expiredEl = document.getElementById('expired-message');
+
+    if (listEl) {
+      listEl.innerHTML = '';
+      listEl.classList.add('is-loading');
+    }
+
+    if (metaEl) metaEl.style.display = 'none';
+    if (labelEl) labelEl.style.display = 'none';
+    if (expiredEl) expiredEl.style.display = 'none';
+    if (pdfBtn) pdfBtn.disabled = true;
+
+    setStatusHero(message, tone || 'error', false);
+  }
+
+  function showExpiredState(plan) {
+    const expiredEl = document.getElementById('expired-message');
+    if (expiredEl) expiredEl.style.display = 'none';
+    showViewerStatusOnly('This shared session link has expired. Please contact your coach for a new link.', 'error');
+  }
+
+  // ===== Video modal controls =====
+  const videoModal  = document.getElementById('video-modal');
+  const videoFrame  = document.getElementById('video-iframe');
+  const videoClose  = document.getElementById('video-close');
+
+  function openVideo(url) {
+    if (!url) return;
+    videoFrame.src = url;
+    videoModal.classList.add('is-visible');
+  }
+
+  function closeVideo() {
+    videoFrame.src = '';
+    videoModal.classList.remove('is-visible');
+  }
+
+  videoClose.addEventListener('click', closeVideo);
+  videoModal.addEventListener('click', (e) => {
+    if (e.target === videoModal) closeVideo();
+  });
+
+  // ===== Render the shared session =====
+  function renderSession(plan, options) {
+    options = options || {};
+    const dateEl   = document.getElementById('meta-date');
+    const coachEl  = document.getElementById('meta-coach');
+    const ageEl    = document.getElementById('meta-age');
+    const themeEl  = document.getElementById('meta-theme');
+    const listEl   = document.getElementById('activity-list');
+    const metaEl   = document.querySelector('.session-meta');
+    const labelEl  = document.querySelector('.activities-label');
+
+    if (metaEl) metaEl.style.display = '';
+    if (labelEl) labelEl.style.display = '';
+
+    dateEl.textContent  = plan.date || '';
+    coachEl.textContent = plan.coach || '';
+    ageEl.textContent   = plan.ageGroup || '';
+    themeEl.textContent = plan.theme || '';
+
+    const rows = Array.isArray(plan.rows) ? plan.rows : [];
+    if (!rows.length) {
+      setStatusHero('No activities found in this shared session.', 'error', false);
+      listEl.innerHTML = '';
+      return;
+    }
+
+    if (!options.keepStatusHero) {
+      hideStatusHero();
+      listEl.innerHTML = '';
+    } else {
+      const hero = document.getElementById('session-status-hero');
+      const preservedHero = hero && hero.parentNode === listEl ? hero : null;
+      listEl.innerHTML = '';
+      if (preservedHero) listEl.appendChild(preservedHero);
+    }
+
+    const pdfBtnLocal = document.getElementById('download-pdf-btn');
+    if (pdfBtnLocal) pdfBtnLocal.disabled = false;
+
+    rows.forEach((row, index) => {
       const drill = DRILL_BY_ID.get(row.drillId) || {};
       const fallbackDrill = {
         name: row.drillName || '',
@@ -1053,575 +524,695 @@ function downloadPdfFromPlan(plan) {
         defaultNotes: row.defaultNotes || ''
       };
       const mergedDrill = Object.assign({}, fallbackDrill, drill || {});
-      const notesText = row.notes || mergedDrill.defaultNotes || '';
-      const timeText  = row.time || '';
-      const imgUrl    = mergedDrill.imageUrl || '';
+      const imgUrl   = mergedDrill.imageUrl || '';
+      const videoUrl = mergedDrill.videoUrl || '';
+      const pdfUrl   = mergedDrill.pdfUrl   || '';
+      const notes    = row.notes || mergedDrill.defaultNotes || '';
+      const time     = row.time || '';
 
-      return `
-        <article class="sss-print-row" style="min-height:${minHeightPx}px;">
-          <div class="sss-print-visual">
+      const article = document.createElement('article');
+      article.className = 'activity-row';
+
+      article.innerHTML = `
+        <div class="activity-visual">
+          <div class="activity-visual-inner">
             ${
               imgUrl
-                ? `<img src="${esc(imgUrl)}" alt="${esc(mergedDrill.name || 'Session diagram')}">`
-                : '<div class="sss-print-visual__placeholder">Session diagram</div>'
+                ? `<img src="${imgUrl}" alt="${mergedDrill.name || 'Session diagram'}">`
+                : `<div style="padding:18px;color:#e5e7eb;font-size:11px;text-align:center;">Session diagram</div>`
             }
-          </div>
-          <div class="sss-print-notes">
-            <h3 class="sss-print-activity-title">${globalIndex}. ${esc(mergedDrill.name || 'Activity')}</h3>
-            ${timeText ? `<p class="sss-print-activity-time"><strong>Time:</strong> ${esc(timeText)}</p>` : ''}
-            <div class="sss-print-notes__body">
-              ${notesText ? `<p>${nl2br(notesText)}</p>` : ''}
+            <div class="activity-visual-hint">
+              ${
+                videoUrl
+                  ? 'Click to watch demo video'
+                  : (pdfUrl ? 'Click to open session PDF' : 'Click to open game resources')
+              }
             </div>
           </div>
-        </article>
+        </div>
+        <div class="activity-notes">
+          <h3>${index + 1}. ${mergedDrill.name || 'Activity'}</h3>
+          ${time ? `<p class="activity-time"><strong>Time:</strong> ${time}</p>` : ''}
+          ${
+            notes
+              ? `<p>${notes.replace(/\n/g,'<br>')}</p>`
+              : ''
+          }
+          <div class="activity-links">
+            ${pdfUrl ? `<a href="${pdfUrl}" target="_blank" rel="noopener">Session PDF</a>` : ''}
+            ${videoUrl ? `<a href="${videoUrl}" target="_blank" rel="noopener">Video (open in new tab)</a>` : ''}
+          </div>
+        </div>
+      `;
+
+      const visual = article.querySelector('.activity-visual-inner');
+      visual.addEventListener('click', () => {
+        if (videoUrl) {
+          openVideo(videoUrl);
+        } else if (pdfUrl) {
+          window.open(pdfUrl, '_blank');
+        }
+      });
+
+      listEl.appendChild(article);
+    });
+  }
+
+  // ===== PDF generation from shared plan =====
+  function downloadPdfFromPlan(plan) {
+    const rows = Array.isArray(plan.rows) ? plan.rows : [];
+    const selectedRows = rows.filter(r => !!r.drillId);
+
+    if (!selectedRows.length) {
+      alert('This shared session has no games to print.');
+      return;
+    }
+    if (selectedRows.length > MAX_PDF_ACTIVITIES) {
+      alert('This shared session contains more than ' + MAX_PDF_ACTIVITIES + ' games. Please reduce the number in the planner.');
+      return;
+    }
+
+    const dateVal  = plan.date || '';
+    const coachVal = plan.coach || '';
+    const ageVal   = plan.ageGroup || '';
+    const themeVal = plan.theme || '';
+    const isSafariPrint = /^((?!chrome|android|crios|fxios|edgios).)*safari/i.test(navigator.userAgent || '');
+    const isMobileSafariPrint = /iP(?:hone|ad|od)/i.test(navigator.userAgent || '') && isSafariPrint;
+    const MAX_PER_PAGE = MAX_PDF_ACTIVITIES_PER_PAGE;
+    const esc = (value) => String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+    const nl2br = (value) => esc(value).replace(/\n/g, '<br>');
+
+    const pages = [];
+    for (let i = 0; i < selectedRows.length; i += MAX_PER_PAGE) {
+      pages.push(selectedRows.slice(i, i + MAX_PER_PAGE));
+    }
+
+    const pagesHtml = pages.map((pageRows, pageIndex) => {
+      const rowsPerPage = pageRows.length;
+      let minHeightPx = rowsPerPage >= 4 ? 210 : 250;
+      if (isSafariPrint) {
+        minHeightPx = rowsPerPage >= 4 ? 205 : 245;
+      }
+      if (isMobileSafariPrint) {
+        minHeightPx = rowsPerPage >= 4 ? 190 : 230;
+      }
+
+      const activitiesHtml = pageRows.map((row, idxOnPage) => {
+        const globalIndex = pageIndex * MAX_PER_PAGE + idxOnPage + 1;
+        const drill = DRILL_BY_ID.get(row.drillId) || {};
+        const fallbackDrill = {
+          name: row.drillName || '',
+          imageUrl: row.imageUrl || '',
+          videoUrl: row.videoUrl || '',
+          pdfUrl: row.pdfUrl || '',
+          defaultNotes: row.defaultNotes || ''
+        };
+        const mergedDrill = Object.assign({}, fallbackDrill, drill || {});
+        const notesText = row.notes || mergedDrill.defaultNotes || '';
+        const timeText  = row.time || '';
+        const imgUrl    = mergedDrill.imageUrl || '';
+
+        return `
+          <article class="sss-print-row" style="min-height:${minHeightPx}px;">
+            <div class="sss-print-visual">
+              ${
+                imgUrl
+                  ? `<img src="${esc(imgUrl)}" alt="${esc(mergedDrill.name || 'Session diagram')}">`
+                  : '<div class="sss-print-visual__placeholder">Session diagram</div>'
+              }
+            </div>
+            <div class="sss-print-notes">
+              <h3 class="sss-print-activity-title">${globalIndex}. ${esc(mergedDrill.name || 'Activity')}</h3>
+              ${timeText ? `<p class="sss-print-activity-time"><strong>Time:</strong> ${esc(timeText)}</p>` : ''}
+              <div class="sss-print-notes__body">
+                ${notesText ? `<p>${nl2br(notesText)}</p>` : ''}
+              </div>
+            </div>
+          </article>
+        `;
+      }).join('');
+
+      return `
+        <section class="sss-print-page sss-print-page--${rowsPerPage}">
+          <div class="sss-print-main">
+            <header class="sss-print-header">
+              <div class="sss-print-brand">
+                <img
+                  src="${STATUS_HERO_DEFAULT_LOGO}"
+                  alt="Soccer Skill Schools logo"
+                  class="sss-print-logo">
+              </div>
+              <div class="sss-print-title-block">
+                <h1 class="sss-print-title">Interactive Session Plan</h1>
+                <p class="sss-print-subtitle">Custom session built from the Soccer Skill Schools game library.</p>
+              </div>
+              <div class="sss-print-brand sss-print-brand--right">Session Plan</div>
+            </header>
+            <section class="sss-print-meta">
+              <div>
+                <div class="sss-print-field-label">Date</div>
+                <div class="sss-print-field-value">${esc(dateVal)}</div>
+              </div>
+              <div>
+                <div class="sss-print-field-label">Coach</div>
+                <div class="sss-print-field-value">${esc(coachVal)}</div>
+              </div>
+              <div>
+                <div class="sss-print-field-label">Age group</div>
+                <div class="sss-print-field-value">${esc(ageVal)}</div>
+              </div>
+              <div>
+                <div class="sss-print-field-label">Session theme</div>
+                <div class="sss-print-field-value">${esc(themeVal)}</div>
+              </div>
+            </section>
+            <section class="sss-print-activities sss-print-activities--${rowsPerPage}">
+              ${activitiesHtml}
+            </section>
+          </div>
+          <footer class="sss-print-footer">© 2016 Soccer Skill Schools. All rights reserved. This material is proprietary and may not be reproduced or distributed without express written permission.</footer>
+        </section>
       `;
     }).join('');
 
-    return `
-      <section class="sss-print-page sss-print-page--${rowsPerPage}">
-        <div class="sss-print-main">
-          <header class="sss-print-header">
-            <div class="sss-print-brand">
-              <img
-                src="https://images.squarespace-cdn.com/content/68c441422ebffe2e9bfd31ed/a323dcda-562c-4f58-a955-c26cc0207bed/ISS-Logo.png?content-type=image%2Fpng"
-                alt="Soccer Skill Schools logo"
-                class="sss-print-logo">
-            </div>
-            <div class="sss-print-title-block">
-              <h1 class="sss-print-title">Interactive Session Plan</h1>
-              <p class="sss-print-subtitle">Custom session built from the Soccer Skill Schools game library.</p>
-            </div>
-            <div class="sss-print-brand sss-print-brand--right">Session Plan</div>
-          </header>
-          <section class="sss-print-meta">
-            <div>
-              <div class="sss-print-field-label">Date</div>
-              <div class="sss-print-field-value">${esc(dateVal)}</div>
-            </div>
-            <div>
-              <div class="sss-print-field-label">Coach</div>
-              <div class="sss-print-field-value">${esc(coachVal)}</div>
-            </div>
-            <div>
-              <div class="sss-print-field-label">Age group</div>
-              <div class="sss-print-field-value">${esc(ageVal)}</div>
-            </div>
-            <div>
-              <div class="sss-print-field-label">Session theme</div>
-              <div class="sss-print-field-value">${esc(themeVal)}</div>
-            </div>
-          </section>
-          <section class="sss-print-activities sss-print-activities--${rowsPerPage}">
-            ${activitiesHtml}
-          </section>
-        </div>
-        <footer class="sss-print-footer">© 2016 Soccer Skill Schools. All rights reserved. This material is proprietary and may not be reproduced or distributed without express written permission.</footer>
-      </section>
-    `;
-  }).join('');
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
 
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) return;
+    printWindow.document.open();
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>Session Plan – Soccer Skill Schools</title>
+        <link rel="stylesheet" href="https://use.typekit.net/uda1vep.css">
+        <style>
+          @page { size: Letter portrait; margin: 0.26in; }
+          * { box-sizing: border-box; }
+          html, body {
+            margin: 0;
+            padding: 0;
+            background: #ffffff;
+            color: #111827;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          }
+          body {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            text-rendering: optimizeLegibility;
+            -webkit-font-smoothing: antialiased;
+          }
+          .sss-print-page {
+            width: 100%;
+            min-height: auto;
+            display: flex;
+            flex-direction: column;
+            page-break-after: always;
+            break-after: page;
+          }
+          .sss-print-page:last-child {
+            page-break-after: auto;
+            break-after: auto;
+          }
+          .sss-print-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+          }
+          .sss-print-header {
+            display: grid;
+            grid-template-columns: 88px 1fr 112px;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+          }
+          .sss-print-brand {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: #111827;
+          }
+          .sss-print-brand--right {
+            text-align: right;
+          }
+          .sss-print-logo {
+            height: 58px;
+            width: auto;
+            display: block;
+          }
+          .sss-print-title-block {
+            text-align: center;
+          }
+          .sss-print-title {
+            margin: 0;
+            font-family: "cheddar-gothic-sans", sans-serif;
+            font-size: 22px;
+            line-height: 1;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+          }
+          .sss-print-subtitle {
+            margin: 3px 0 0;
+            font-size: 10px;
+            color: #6b7280;
+            letter-spacing: 0.02em;
+          }
+          .sss-print-meta {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0,1fr));
+            gap: 4px;
+            margin-bottom: 8px;
+          }
+          .sss-print-field-label {
+            margin-bottom: 2px;
+            font-size: 8px;
+            font-weight: 700;
+            color: #4b5563;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+          }
+          .sss-print-field-value {
+            min-height: 17px;
+            padding: 2px 5px;
+            border: 1px solid #dfe3ea;
+            border-radius: 6px;
+            font-size: 9px;
+          }
+          .sss-print-activities {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-height: 0;
+            margin-top: 2px;
+          }
+          .sss-print-activities--1,
+          .sss-print-activities--2,
+          .sss-print-activities--3,
+          .sss-print-activities--4 {
+            display: flex;
+            flex-direction: column;
+          }
+          .sss-print-row {
+            display: grid;
+            grid-template-columns: 46% 54%;
+            gap: 4px;
+            padding: 4px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #ffffff;
+            align-items: start;
+            overflow: visible;
+            height: auto;
+            page-break-inside: avoid !important;
+            break-inside: avoid-page !important;
+          }
+          .sss-print-visual {
+            height: 200px;
+            min-height: 200px;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #f3f4f6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 0;
+          }
+          .sss-print-visual img {
+            display: block;
+            max-width: 100%;
+            max-height: 92%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+            margin: 0 auto;
+          }
+          .sss-print-visual__placeholder {
+            font-size: 9px;
+            color: #6b7280;
+            padding: 6px;
+            text-align: center;
+          }
+          .sss-print-notes {
+            min-height: 0;
+            overflow: visible;
+            display: flex;
+            flex-direction: column;
+          }
+          .sss-print-activity-title {
+            margin: 0 0 3px;
+            font-size: 11px;
+            line-height: 1.1;
+            font-weight: 700;
+          }
+          .sss-print-activity-time {
+            margin: 0 0 4px;
+            font-size: 9px;
+            line-height: 1.15;
+          }
+          .sss-print-notes__body {
+            min-height: 0;
+            overflow: visible;
+            font-size: 9px;
+            line-height: 1.18;
+          }
+          .sss-print-notes__body p {
+            margin: 0;
+          }
+          .sss-print-footer {
+            margin-top: 6px;
+            padding-top: 4px;
+            border-top: 1px solid #e5e7eb;
+            text-align: right;
+            color: #9ca3af;
+            font-size: 8px;
+          }
 
-  printWindow.document.open();
-  printWindow.document.write(`
-    <!doctype html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width,initial-scale=1">
-      <title>Session Plan – Soccer Skill Schools</title>
-      <link rel="stylesheet" href="https://use.typekit.net/uda1vep.css">
-      <style>
-        @page { size: Letter portrait; margin: 0.26in; }
-        * { box-sizing: border-box; }
-        html, body {
-          margin: 0;
-          padding: 0;
-          background: #ffffff;
-          color: #111827;
-          font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        }
-        body {
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
-          text-rendering: optimizeLegibility;
-          -webkit-font-smoothing: antialiased;
-        }
-        .sss-print-page {
-          width: 100%;
-          min-height: auto;
-          display: flex;
-          flex-direction: column;
-          page-break-after: always;
-          break-after: page;
-        }
-        .sss-print-page:last-child {
-          page-break-after: auto;
-          break-after: auto;
-        }
-        .sss-print-main {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          min-height: 0;
-        }
-        .sss-print-header {
-          display: grid;
-          grid-template-columns: 88px 1fr 112px;
-          align-items: center;
-          gap: 8px;
-          margin-bottom: 6px;
-        }
-        .sss-print-brand {
-          font-size: 9px;
-          font-weight: 700;
-          letter-spacing: 0.18em;
-          text-transform: uppercase;
-          color: #111827;
-        }
-        .sss-print-brand--right {
-          text-align: right;
-        }
-        .sss-print-logo {
-          height: 58px;
-          width: auto;
-          display: block;
-        }
-        .sss-print-title-block {
-          text-align: center;
-        }
-        .sss-print-title {
-          margin: 0;
-          font-family: "cheddar-gothic-sans", sans-serif;
-          font-size: 22px;
-          line-height: 1;
-          letter-spacing: 0.04em;
-          text-transform: uppercase;
-        }
-        .sss-print-subtitle {
-          margin: 3px 0 0;
-          font-size: 10px;
-          color: #6b7280;
-          letter-spacing: 0.02em;
-        }
-        .sss-print-meta {
-          display: grid;
-          grid-template-columns: repeat(4, minmax(0,1fr));
-          gap: 4px;
-          margin-bottom: 8px;
-        }
-        .sss-print-field-label {
-          margin-bottom: 2px;
-          font-size: 8px;
-          font-weight: 700;
-          color: #4b5563;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-        }
-        .sss-print-field-value {
-          min-height: 17px;
-          padding: 2px 5px;
-          border: 1px solid #dfe3ea;
-          border-radius: 6px;
-          font-size: 9px;
-        }
-        .sss-print-activities {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          min-height: 0;
-          margin-top: 2px;
-        }
-        .sss-print-activities--1,
-        .sss-print-activities--2,
-        .sss-print-activities--3,
-        .sss-print-activities--4 {
-          display: flex;
-          flex-direction: column;
-        }
-        .sss-print-row {
-          display: grid;
-          grid-template-columns: 46% 54%;
-          gap: 4px;
-          padding: 4px;
-          border: 1px solid #e5e7eb;
-          border-radius: 8px;
-          background: #ffffff;
-          align-items: start;
-          overflow: visible;
-          height: auto;
-          page-break-inside: avoid !important;
-          break-inside: avoid-page !important;
-        }
-        .sss-print-visual {
-          height: 200px;
-          min-height: 200px;
-          border-radius: 8px;
-          overflow: hidden;
-          background: #f3f4f6;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin: 0;
-          padding: 0;
-        }
-        .sss-print-visual img {
-          display: block;
-          max-width: 100%;
-          max-height: 92%;
-          width: auto;
-          height: auto;
-          object-fit: contain;
-          transform: translateZ(0);
-          -webkit-transform: translateZ(0);
-          margin: 0 auto;
-        }
-        .sss-print-visual__placeholder {
-          font-size: 9px;
-          color: #6b7280;
-          padding: 6px;
-          text-align: center;
-        }
-        .sss-print-notes {
-          min-height: 0;
-          overflow: visible;
-          display: flex;
-          flex-direction: column;
-        }
-        .sss-print-activity-title {
-          margin: 0 0 3px;
-          font-size: 11px;
-          line-height: 1.1;
-          font-weight: 700;
-        }
-        .sss-print-activity-time {
-          margin: 0 0 4px;
-          font-size: 9px;
-          line-height: 1.15;
-        }
-        .sss-print-notes__body {
-          min-height: 0;
-          overflow: visible;
-          font-size: 9px;
-          line-height: 1.18;
-        }
-        .sss-print-notes__body p {
-          margin: 0;
-        }
-        .sss-print-footer {
-          margin-top: 6px;
-          padding-top: 4px;
-          border-top: 1px solid #e5e7eb;
-          text-align: right;
-          color: #9ca3af;
-          font-size: 8px;
-        }
-        
-        body.sss-print-safari .sss-print-page {
-          min-height: auto;
-          overflow: visible;
-        }
-        
-        body.sss-print-safari .sss-print-header {
-          grid-template-columns: 74px 1fr 96px;
-          gap: 6px;
-          margin-bottom: 5px;
-        }
-        
-        body.sss-print-safari .sss-print-logo {
-          height: 48px;
-        }
-        
-        body.sss-print-safari .sss-print-title {
-          font-size: 19px;
-        }
-        
-        body.sss-print-safari .sss-print-subtitle {
-          font-size: 8px;
-          margin-top: 2px;
-        }
-        
-        body.sss-print-safari .sss-print-meta {
-          gap: 3px;
-          margin-bottom: 6px;
-        }
-        
-        body.sss-print-safari .sss-print-field-label {
-          font-size: 7px;
-          margin-bottom: 1px;
-        }
-        
-        body.sss-print-safari .sss-print-field-value {
-          min-height: 15px;
-          padding: 2px 4px;
-          font-size: 8px;
-        }
-        
-        body.sss-print-safari .sss-print-activities {
-          gap: 3px;
-          margin-top: 1px;
-        }
-        
-        body.sss-print-safari .sss-print-row {
-          grid-template-columns: 45% 55%;
-          gap: 3px;
-          padding: 3px;
-          border-radius: 8px;
-        }
-        
-        body.sss-print-safari .sss-print-visual {
-          height: 195px;
-          min-height: 195px;
-        }
-        
-        body.sss-print-safari .sss-print-visual img {
-          max-width: 100%;
-          max-height: 90%;
-        }
-        
-        body.sss-print-safari .sss-print-activity-title {
-          margin-bottom: 3px;
-          font-size: 11px;
-          line-height: 1.1;
-          font-weight: 700;
-        }
-        
-        body.sss-print-safari .sss-print-activity-time {
-          margin-bottom: 3px;
-          font-size: 9px;
-          line-height: 1.12;
-        }
-        
-        body.sss-print-safari .sss-print-notes__body {
-          font-size: 9px;
-          line-height: 1.18;
-          display: -webkit-box;
-          -webkit-line-clamp: 20;
-          -webkit-box-orient: vertical;
-          overflow: visible;
-        }
-        
-        body.sss-print-safari .sss-print-footer {
-          margin-top: 6px;
-          padding-top: 4px;
-          font-size: 8px;
-        }
-        
-        body.sss-print-mobile-safari .sss-print-header {
-          grid-template-columns: 60px 1fr 78px;
-          gap: 4px;
-          margin-bottom: 4px;
-        }
+          body.sss-print-safari .sss-print-page {
+            min-height: auto;
+            overflow: visible;
+          }
 
-        body.sss-print-mobile-safari .sss-print-logo {
-          height: 40px;
-        }
+          body.sss-print-safari .sss-print-header {
+            grid-template-columns: 74px 1fr 96px;
+            gap: 6px;
+            margin-bottom: 5px;
+          }
 
-        body.sss-print-mobile-safari .sss-print-title {
-          font-size: 16px;
-        }
+          body.sss-print-safari .sss-print-logo {
+            height: 48px;
+          }
 
-        body.sss-print-mobile-safari .sss-print-subtitle {
-          font-size: 7px;
-          margin-top: 1px;
-        }
+          body.sss-print-safari .sss-print-title {
+            font-size: 19px;
+          }
 
-        body.sss-print-mobile-safari .sss-print-meta {
-          gap: 2px;
-          margin-bottom: 4px;
-        }
+          body.sss-print-safari .sss-print-subtitle {
+            font-size: 8px;
+            margin-top: 2px;
+          }
 
-        body.sss-print-mobile-safari .sss-print-field-label {
-          font-size: 6.5px;
-          margin-bottom: 1px;
-        }
+          body.sss-print-safari .sss-print-meta {
+            gap: 3px;
+            margin-bottom: 6px;
+          }
 
-        body.sss-print-mobile-safari .sss-print-field-value {
-          min-height: 12px;
-          padding: 2px 3px;
-          font-size: 7px;
-        }
+          body.sss-print-safari .sss-print-field-label {
+            font-size: 7px;
+            margin-bottom: 1px;
+          }
 
-        body.sss-print-mobile-safari .sss-print-activities {
-          gap: 2px;
-          margin-top: 1px;
-        }
+          body.sss-print-safari .sss-print-field-value {
+            min-height: 15px;
+            padding: 2px 4px;
+            font-size: 8px;
+          }
 
-        body.sss-print-mobile-safari .sss-print-row {
-          grid-template-columns: 45% 55%;
-          gap: 2px;
-          padding: 2px;
-          border-radius: 7px;
-        }
+          body.sss-print-safari .sss-print-activities {
+            gap: 3px;
+            margin-top: 1px;
+          }
 
-        body.sss-print-mobile-safari .sss-print-visual {
-          height: 180px;
-          min-height: 180px;
-        }
+          body.sss-print-safari .sss-print-row {
+            grid-template-columns: 45% 55%;
+            gap: 3px;
+            padding: 3px;
+            border-radius: 8px;
+          }
 
-        body.sss-print-mobile-safari .sss-print-visual img {
-          max-width: 100%;
-          max-height: 100%;
-        }
+          body.sss-print-safari .sss-print-visual {
+            height: 195px;
+            min-height: 195px;
+          }
 
-        body.sss-print-mobile-safari .sss-print-activity-title {
-          margin-bottom: 1px;
-          font-size: 7.8px;
-        }
+          body.sss-print-safari .sss-print-visual img {
+            max-width: 100%;
+            max-height: 90%;
+          }
 
-        body.sss-print-mobile-safari .sss-print-activity-time {
-          margin-bottom: 1px;
-          font-size: 6.8px;
-        }
+          body.sss-print-safari .sss-print-activity-title {
+            margin-bottom: 3px;
+            font-size: 11px;
+            line-height: 1.1;
+            font-weight: 700;
+          }
 
-        body.sss-print-mobile-safari .sss-print-notes__body {
-          font-size: 6.4px;
-          line-height: 1.04;
-          display: -webkit-box;
-          -webkit-line-clamp: 20;
-          -webkit-box-orient: vertical;
-          overflow: visible;
-        }
+          body.sss-print-safari .sss-print-activity-time {
+            margin-bottom: 3px;
+            font-size: 9px;
+            line-height: 1.12;
+          }
 
-        body.sss-print-mobile-safari .sss-print-footer {
-          margin-top: 0;
-          padding-top: 1px;
-          font-size: 5.8px;
-        }
+          body.sss-print-safari .sss-print-notes__body {
+            font-size: 9px;
+            line-height: 1.18;
+            display: -webkit-box;
+            -webkit-line-clamp: 20;
+            -webkit-box-orient: vertical;
+            overflow: visible;
+          }
 
-        body.sss-print-mobile-safari .sss-print-page--4 .sss-print-activities {
-          gap: 1px;
-          margin-top: 0;
-        }
+          body.sss-print-safari .sss-print-footer {
+            margin-top: 6px;
+            padding-top: 4px;
+            font-size: 8px;
+          }
 
-        body.sss-print-mobile-safari .sss-print-page--4 .sss-print-row {
-          gap: 1px;
-          padding: 1px;
-        }
+          body.sss-print-mobile-safari .sss-print-header {
+            grid-template-columns: 60px 1fr 78px;
+            gap: 4px;
+            margin-bottom: 4px;
+          }
 
-        body.sss-print-mobile-safari .sss-print-page--4 .sss-print-visual {
-          height: 180px;
-          min-height: 180px;
-        }
+          body.sss-print-mobile-safari .sss-print-logo {
+            height: 40px;
+          }
 
-        body.sss-print-mobile-safari .sss-print-page--4 .sss-print-notes__body {
-          font-size: 6.1px;
-          line-height: 1.02;
-          -webkit-line-clamp: 20;
-        }
+          body.sss-print-mobile-safari .sss-print-title {
+            font-size: 16px;
+          }
 
-        body.sss-print-mobile-safari .sss-print-page--4 .sss-print-footer {
-          margin-top: 0;
-          padding-top: 1px;
-          font-size: 5.5px;
-        }
-      </style>
-    </head>
-    <body class="${[isSafariPrint ? 'sss-print-safari' : '', isMobileSafariPrint ? 'sss-print-mobile-safari' : ''].filter(Boolean).join(' ')}">
-      ${pagesHtml}
-    </body>
-    </html>
-  `);
-  printWindow.document.close();
-  printWindow.onload = function() {
-    const firePrint = function() {
-      setTimeout(function() {
-        printWindow.focus();
-        printWindow.print();
-      }, 300);
-    };
-    try {
-      const doc = printWindow.document;
-      const imagePromises = Array.from(doc.images || []).map(img => {
-        if (img.complete) return Promise.resolve();
-        return new Promise(resolve => {
-          const done = () => resolve();
-          img.addEventListener('load', done, { once: true });
-          img.addEventListener('error', done, { once: true });
-        });
-      });
-      const fontsReady = doc.fonts && doc.fonts.ready ? doc.fonts.ready.catch(() => {}) : Promise.resolve();
-      Promise.all([fontsReady].concat(imagePromises)).then(() => {
-        if (isSafariPrint && printWindow.requestAnimationFrame) {
-          printWindow.requestAnimationFrame(() => {
-            printWindow.requestAnimationFrame(firePrint);
+          body.sss-print-mobile-safari .sss-print-subtitle {
+            font-size: 7px;
+            margin-top: 1px;
+          }
+
+          body.sss-print-mobile-safari .sss-print-meta {
+            gap: 2px;
+            margin-bottom: 4px;
+          }
+
+          body.sss-print-mobile-safari .sss-print-field-label {
+            font-size: 6.5px;
+            margin-bottom: 1px;
+          }
+
+          body.sss-print-mobile-safari .sss-print-field-value {
+            min-height: 12px;
+            padding: 2px 3px;
+            font-size: 7px;
+          }
+
+          body.sss-print-mobile-safari .sss-print-activities {
+            gap: 2px;
+            margin-top: 1px;
+          }
+
+          body.sss-print-mobile-safari .sss-print-row {
+            grid-template-columns: 45% 55%;
+            gap: 2px;
+            padding: 2px;
+            border-radius: 7px;
+          }
+
+          body.sss-print-mobile-safari .sss-print-visual {
+            height: 180px;
+            min-height: 180px;
+          }
+
+          body.sss-print-mobile-safari .sss-print-visual img {
+            max-width: 100%;
+            max-height: 100%;
+          }
+
+          body.sss-print-mobile-safari .sss-print-activity-title {
+            margin-bottom: 1px;
+            font-size: 7.8px;
+          }
+
+          body.sss-print-mobile-safari .sss-print-activity-time {
+            margin-bottom: 1px;
+            font-size: 6.8px;
+          }
+
+          body.sss-print-mobile-safari .sss-print-notes__body {
+            font-size: 6.4px;
+            line-height: 1.04;
+            display: -webkit-box;
+            -webkit-line-clamp: 20;
+            -webkit-box-orient: vertical;
+            overflow: visible;
+          }
+
+          body.sss-print-mobile-safari .sss-print-footer {
+            margin-top: 0;
+            padding-top: 1px;
+            font-size: 5.8px;
+          }
+
+          body.sss-print-mobile-safari .sss-print-page--4 .sss-print-activities {
+            gap: 1px;
+            margin-top: 0;
+          }
+
+          body.sss-print-mobile-safari .sss-print-page--4 .sss-print-row {
+            gap: 1px;
+            padding: 1px;
+          }
+
+          body.sss-print-mobile-safari .sss-print-page--4 .sss-print-visual {
+            height: 180px;
+            min-height: 180px;
+          }
+
+          body.sss-print-mobile-safari .sss-print-page--4 .sss-print-notes__body {
+            font-size: 6.1px;
+            line-height: 1.02;
+            -webkit-line-clamp: 20;
+          }
+
+          body.sss-print-mobile-safari .sss-print-page--4 .sss-print-footer {
+            margin-top: 0;
+            padding-top: 1px;
+            font-size: 5.5px;
+          }
+        </style>
+      </head>
+      <body class="${[isSafariPrint ? 'sss-print-safari' : '', isMobileSafariPrint ? 'sss-print-mobile-safari' : ''].filter(Boolean).join(' ')}">
+        ${pagesHtml}
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.onload = function() {
+      const firePrint = function() {
+        setTimeout(function() {
+          printWindow.focus();
+          printWindow.print();
+        }, 300);
+      };
+      try {
+        const doc = printWindow.document;
+        const imagePromises = Array.from(doc.images || []).map(img => {
+          if (img.complete) return Promise.resolve();
+          return new Promise(resolve => {
+            const done = () => resolve();
+            img.addEventListener('load', done, { once: true });
+            img.addEventListener('error', done, { once: true });
           });
-        } else {
-          firePrint();
-        }
-      });
-    } catch (e) {
-      firePrint();
-    }
-  };
-}
-function planNeedsDrillLibrary(plan) {
-  const rows = Array.isArray(plan && plan.rows) ? plan.rows : [];
-  if (!rows.length) return false;
-
-  return rows.some(row => {
-    const hasName  = !!String(row.drillName || "").trim();
-    const hasImage = !!String(row.imageUrl || "").trim();
-    const hasVideo = !!String(row.videoUrl || "").trim();
-    const hasPdf   = !!String(row.pdfUrl || "").trim();
-    return !(hasName && (hasImage || hasVideo || hasPdf));
-  });
-}
-
-        (async function init() {
-  setStatusHero('Loading session…', '', true);
-
-  const sessionId = getSharedSessionIdFromUrl();
-  if (!sessionId) {
-    showViewerStatusOnly('No shared session ID was found in this link.', 'error');
-    return;
+        });
+        const fontsReady = doc.fonts && doc.fonts.ready ? doc.fonts.ready.catch(() => {}) : Promise.resolve();
+        Promise.all([fontsReady].concat(imagePromises)).then(() => {
+          if (isSafariPrint && printWindow.requestAnimationFrame) {
+            printWindow.requestAnimationFrame(() => {
+              printWindow.requestAnimationFrame(firePrint);
+            });
+          } else {
+            firePrint();
+          }
+        });
+      } catch (e) {
+        firePrint();
+      }
+    };
   }
 
-  const sharedRes = await fetchSharedSessionById(sessionId);
-  if (!sharedRes || !sharedRes.ok || !sharedRes.session) {
-    showViewerStatusOnly(
-      (sharedRes && sharedRes.error) ? sharedRes.error : 'Could not load this shared session.',
-      'error'
-    );
-    return;
-  }
+  function planNeedsDrillLibrary(plan) {
+    const rows = Array.isArray(plan && plan.rows) ? plan.rows : [];
+    if (!rows.length) return false;
 
-  const plan = parseSharedSessionPayload(sharedRes.session);
-  if (!plan) {
-    showViewerStatusOnly('This shared session did not contain a valid payload.', 'error');
-    return;
-  }
-
-  currentPlan = plan;
-  showExpiryOnPage(plan);
-
-  const expired = isPlanExpired(plan);
-  if (expired) {
-    showExpiredState(plan);
-    return;
-  }
-
-  // Render immediately from the shared payload first
-  setStatusHero('Loading session activities…', '', true);
-  renderSession(plan);
-
-  // Only fetch the drill library if something important is missing
-  if (!planNeedsDrillLibrary(plan)) {
-    return;
-  }
-
-  // Hydrate in the background
-  loadDrillsViaJSONP()
-    .then(() => {
-      console.log('Loaded drills:', DRILLS.length);
-      renderSession(plan);
-    })
-    .catch((e) => {
-      console.warn('Background drill hydrate failed:', e);
+    return rows.some(row => {
+      const hasName  = !!String(row.drillName || "").trim();
+      const hasImage = !!String(row.imageUrl || "").trim();
+      const hasVideo = !!String(row.videoUrl || "").trim();
+      const hasPdf   = !!String(row.pdfUrl || "").trim();
+      return !(hasName && (hasImage || hasVideo || hasPdf));
     });
-})();
+  }
 
-  </script>
-</body>
-</html>
+  (async function init() {
+    setStatusHero('Loading session…', '', true);
+
+    const sessionId = getSharedSessionIdFromUrl();
+    if (!sessionId) {
+      showViewerStatusOnly('No shared session ID was found in this link.', 'error');
+      return;
+    }
+
+    // 1) Try cached shared session first
+    const cachedSession = readCachedSharedSession(sessionId);
+    let cachedPlan = null;
+
+    if (cachedSession) {
+      cachedPlan = parseSharedSessionPayload(cachedSession);
+      if (cachedPlan && !isPlanExpired(cachedPlan)) {
+        currentPlan = cachedPlan;
+        showExpiryOnPage(cachedPlan);
+        renderSession(cachedPlan);
+      } else if (cachedPlan && cachedPlan.__thumb) {
+        showThumbPreview(cachedPlan);
+      }
+    }
+
+    // 2) Fetch fresh session in background
+    const sharedRes = await fetchSharedSessionById(sessionId);
+    if (!sharedRes || !sharedRes.ok || !sharedRes.session) {
+      if (!cachedPlan) {
+        showViewerStatusOnly(
+          (sharedRes && sharedRes.error) ? sharedRes.error : 'Could not load this shared session.',
+          'error'
+        );
+      }
+      return;
+    }
+
+    const freshPlan = parseSharedSessionPayload(sharedRes.session);
+    if (!freshPlan) {
+      if (!cachedPlan) {
+        showViewerStatusOnly('This shared session did not contain a valid payload.', 'error');
+      }
+      return;
+    }
+
+    currentPlan = freshPlan;
+    showExpiryOnPage(freshPlan);
+
+    if (isPlanExpired(freshPlan)) {
+      showExpiredState(freshPlan);
+      return;
+    }
+
+    renderSession(freshPlan);
+
+    // 3) Hydrate drills only if needed
+    if (!planNeedsDrillLibrary(freshPlan)) return;
+
+    loadDrillsViaJSONP()
+      .then(() => {
+        console.log('Loaded drills:', DRILLS.length);
+        renderSession(freshPlan);
+      })
+      .catch((e) => {
+        console.warn('Background drill hydrate failed:', e);
+      });
+  })();
+</script>
