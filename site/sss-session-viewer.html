@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -522,72 +521,16 @@ This material is proprietary and may not be reproduced or distributed without ex
   // =========================================================
   const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxrwNK2By1uS8_EiX6Sx9tZ4Mpi4P0Z2JWA2H8tkE0Wl-87wakJDkK8ONiTujccHK5PxA/exec";
 
-  // Match the Google Sheet tab names exactly
+  // Match the planner tab names exactly
   const TAB_NAMES = [
     "Attacking",
-    "Fake Change of Directions",
+    "Quarter/Three Quarter Turns",
     "Change of Direction",
-    "Quarter/Three Quarter Turns"
+    "Fake Change of Direction"
   ];
 
-  // =========================================================
-  // DRILL CACHE VERSION
-  // Increase this number anytime you make big Sheet/API changes.
-  // This forces every device to fetch a fresh drill library.
-  // =========================================================
-  const DRILL_CACHE_VERSION = 6;
-  const DRILL_CACHE_KEY = `sss_drills_cache_v${DRILL_CACHE_VERSION}`;
+  const DRILL_CACHE_KEY = "sss_drills_cache_v2";
   const DRILL_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-
-  function clearOldDrillCaches() {
-    const oldKeys = [
-      "sss_drills_cache_v1",
-      "sss_drills_cache_v2",
-      "sss_drills_cache_v3",
-      "sss_drills_cache_v4",
-      "sss_drills_cache_v5"
-    ];
-
-    oldKeys.forEach(key => {
-      try {
-        localStorage.removeItem(key);
-      } catch (e) {}
-    });
-  }
-
-  function shouldForceFreshDrills() {
-    try {
-      const params = new URLSearchParams(window.location.search);
-
-      return (
-        params.get("refreshDrills") === "1" ||
-        params.get("noDrillCache") === "1" ||
-        params.get("clearDrillCache") === "1"
-      );
-    } catch (e) {
-      return false;
-    }
-  }
-
-  function saveDrillsToCache(rows) {
-    try {
-      localStorage.setItem(
-        DRILL_CACHE_KEY,
-        JSON.stringify({
-          version: DRILL_CACHE_VERSION,
-          savedAt: Date.now(),
-          ts: Date.now(),
-          rows: rows
-        })
-      );
-    } catch (e) {
-      console.warn("Could not save drill cache.", e);
-    }
-  }
-
-  // Clear only old drill-library caches. This does NOT clear shared links,
-  // login/session tokens, saved sessions, or favorites.
-  clearOldDrillCaches();
 
   const SHARED_SESSION_CACHE_PREFIX = "sss_shared_session_v1:";
   const SHARED_SESSION_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -655,36 +598,6 @@ This material is proprietary and may not be reproduced or distributed without ex
     }).filter(d => d.name);
   }
 
-  function normalizePayloadToRows(payload) {
-    if (!payload) return null;
-
-    if (Array.isArray(payload)) return payload;
-
-    if (payload && Array.isArray(payload.rows)) return payload.rows;
-    if (payload && Array.isArray(payload.data)) return payload.data;
-    if (payload && Array.isArray(payload.items)) return payload.items;
-    if (payload && Array.isArray(payload.result)) return payload.result;
-
-    if (typeof payload === "string") {
-      try {
-        const parsed = JSON.parse(payload);
-        return normalizePayloadToRows(parsed);
-      } catch (e) {}
-    }
-
-    if (payload && payload.payload) {
-      const nested = normalizePayloadToRows(payload.payload);
-      if (nested) return nested;
-    }
-
-    if (payload && payload.response) {
-      const nested = normalizePayloadToRows(payload.response);
-      if (nested) return nested;
-    }
-
-    return null;
-  }
-
   function loadDrillsViaJSONP() {
     return new Promise((resolve, reject) => {
       if (!APPS_SCRIPT_WEBAPP_URL || APPS_SCRIPT_WEBAPP_URL.includes("PASTE_YOUR")) {
@@ -692,122 +605,65 @@ This material is proprietary and may not be reproduced or distributed without ex
         return;
       }
 
-      const forceFresh = shouldForceFreshDrills();
+      try {
+        const cachedRaw = localStorage.getItem(DRILL_CACHE_KEY);
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw);
+          if (cached && Array.isArray(cached.rows) && (Date.now() - (cached.savedAt || cached.ts || 0) < DRILL_CACHE_TTL_MS)) {
+            DRILLS = mapSheetRowsToDrills(cached.rows);
+            DRILL_BY_ID = new Map(DRILLS.map(d => [d.id, d]));
 
-      if (!forceFresh) {
-        try {
-          const cachedRaw = localStorage.getItem(DRILL_CACHE_KEY);
+            // Quiet background refresh
+            jsonpFetch()
+              .then(rows => {
+                try {
+                  localStorage.setItem(DRILL_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), ts: Date.now(), rows }));
+                } catch (e) {}
+              })
+              .catch(() => {});
 
-          if (cachedRaw) {
-            const cached = JSON.parse(cachedRaw);
-            const savedAt = cached.savedAt || cached.ts || 0;
-            const isFresh = Date.now() - savedAt < DRILL_CACHE_TTL_MS;
-
-            if (
-              cached &&
-              cached.version === DRILL_CACHE_VERSION &&
-              Array.isArray(cached.rows) &&
-              isFresh
-            ) {
-              DRILLS = mapSheetRowsToDrills(cached.rows);
-              DRILL_BY_ID = new Map(DRILLS.map(d => [d.id, d]));
-
-              // Quiet background refresh so the next page load has newest rows.
-              jsonpFetch()
-                .then(rows => saveDrillsToCache(rows))
-                .catch(() => {});
-
-              resolve(DRILLS);
-              return;
-            }
+            resolve(DRILLS);
+            return;
           }
-        } catch (e) {
-          console.warn("Drill cache read failed. Loading fresh drills.", e);
         }
-      }
+      } catch (e) {}
 
-      jsonpFetch()
-        .then(rows => {
-          saveDrillsToCache(rows);
+      jsonpFetch().then(rows => {
+        try {
+          localStorage.setItem(DRILL_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), ts: Date.now(), rows }));
+        } catch (e) {}
 
-          DRILLS = mapSheetRowsToDrills(rows);
-          DRILL_BY_ID = new Map(DRILLS.map(d => [d.id, d]));
-
-          resolve(DRILLS);
-        })
-        .catch(reject);
+        DRILLS = mapSheetRowsToDrills(rows);
+        DRILL_BY_ID = new Map(DRILLS.map(d => [d.id, d]));
+        resolve(DRILLS);
+      }).catch(reject);
 
       function jsonpFetch() {
         return new Promise((res, rej) => {
           const cbName = "__sssDrillsCB_" + Math.random().toString(36).slice(2);
           const script = document.createElement("script");
-          let done = false;
 
           const cleanup = () => {
-            try {
-              delete window[cbName];
-            } catch (e) {}
-
-            if (script && script.parentNode) {
-              script.parentNode.removeChild(script);
-            }
+            try { delete window[cbName]; } catch (e) {}
+            if (script && script.parentNode) script.parentNode.removeChild(script);
           };
 
-          const fail = err => {
-            if (done) return;
-            done = true;
-            cleanup();
-            rej(err);
-          };
-
-          window[cbName] = payload => {
-            if (done) return;
-            done = true;
+          window[cbName] = (payload) => {
             cleanup();
 
-            try {
-              const rows = normalizePayloadToRows(payload);
+            if (!payload) { rej(new Error("Empty response from Apps Script.")); return; }
+            if (Array.isArray(payload)) { res(payload); return; }
+            if (payload && Array.isArray(payload.rows)) { res(payload.rows); return; }
+            if (payload && Array.isArray(payload.data)) { res(payload.data); return; }
 
-              if (rows && Array.isArray(rows)) {
-                res(rows);
-                return;
-              }
-
-              console.warn("Unexpected drills payload shape:", payload);
-
-              if (payload && payload.error) {
-                rej(new Error(payload.error));
-                return;
-              }
-
-              rej(new Error("Unexpected response shape from Apps Script."));
-            } catch (err) {
-              rej(err);
-            }
+            rej(new Error(payload && payload.error ? payload.error : "Unexpected response shape from Apps Script."));
           };
 
           const tabsParam = encodeURIComponent(TAB_NAMES.join(","));
-
-          script.src =
-            APPS_SCRIPT_WEBAPP_URL +
-            "?callback=" +
-            cbName +
-            "&tabs=" +
-            tabsParam +
-            "&cacheBust=" +
-            Date.now();
-
-          script.async = true;
-
-          script.onerror = () => {
-            fail(new Error("JSONP script failed to load."));
-          };
+          script.src = APPS_SCRIPT_WEBAPP_URL + "?callback=" + cbName + "&tabs=" + tabsParam;
+          script.onerror = () => { cleanup(); rej(new Error("JSONP script failed to load.")); };
 
           document.head.appendChild(script);
-
-          setTimeout(() => {
-            fail(new Error("Drills API request timed out."));
-          }, 15000);
         });
       }
     });
@@ -816,7 +672,7 @@ This material is proprietary and may not be reproduced or distributed without ex
   // Always attach the click handler (even if the link is missing/invalid).
   const pdfBtn = document.getElementById('download-pdf-btn');
   if (pdfBtn) {
-    pdfBtn.addEventListener('click', async () => {
+    pdfBtn.addEventListener('click', () => {
       if (!currentPlan) {
         alert('No shared session found to print. Please open a valid shared link from the planner.');
         return;
@@ -825,7 +681,7 @@ This material is proprietary and may not be reproduced or distributed without ex
         alert('This shared session link has expired. Please contact your coach for a new link.');
         return;
       }
-      await downloadPdfFromPlan(currentPlan);
+      downloadPdfFromPlan(currentPlan);
     });
   }
 
@@ -1129,78 +985,6 @@ This material is proprietary and may not be reproduced or distributed without ex
     if (e.target === videoModal) closeVideo();
   });
 
-  // ===== Drill merge helpers =====
-  function firstNonEmpty() {
-    for (const value of arguments) {
-      const str = String(value == null ? "" : value).trim();
-      if (str) return str;
-    }
-    return "";
-  }
-
-  function getDriveFileId(url) {
-    const raw = String(url || "").trim();
-    if (!raw) return "";
-
-    const patterns = [
-      /\/file\/d\/([^/]+)/,
-      /[?&]id=([^&]+)/,
-      /\/d\/([^/]+)/
-    ];
-
-    for (const pattern of patterns) {
-      const match = raw.match(pattern);
-      if (match && match[1]) return decodeURIComponent(match[1]);
-    }
-
-    return "";
-  }
-
-  function normalizeImageUrl(url) {
-    const raw = String(url || "").trim();
-    if (!raw) return "";
-
-    // If a Google Drive preview URL accidentally gets used as an image,
-    // convert it into a Drive thumbnail image URL.
-    if (/drive\.google\.com/i.test(raw)) {
-      const id = getDriveFileId(raw);
-      if (id) {
-        return "https://drive.google.com/thumbnail?id=" + encodeURIComponent(id) + "&sz=w1600";
-      }
-    }
-
-    return raw;
-  }
-
-  function findDrillForRow(row) {
-    const id = String(row && row.drillId || "").trim();
-    if (id && DRILL_BY_ID.has(id)) return DRILL_BY_ID.get(id) || {};
-
-    const rowName = String(row && row.drillName || "").trim().toLowerCase();
-    if (rowName && Array.isArray(DRILLS) && DRILLS.length) {
-      return DRILLS.find(d => String(d.name || "").trim().toLowerCase() === rowName) || {};
-    }
-
-    return {};
-  }
-
-  function mergeRowWithLibrary(row) {
-    const drill = findDrillForRow(row) || {};
-
-    return {
-      id: firstNonEmpty(row && row.drillId, drill.id),
-      name: firstNonEmpty(row && row.drillName, drill.name),
-      imageUrl: normalizeImageUrl(firstNonEmpty(
-        row && row.imageUrl,
-        drill.imageUrl,
-        drill.driveImagePreviewUrl
-      )),
-      videoUrl: firstNonEmpty(row && row.videoUrl, drill.videoUrl),
-      pdfUrl: firstNonEmpty(row && row.pdfUrl, drill.pdfUrl),
-      defaultNotes: firstNonEmpty(row && row.defaultNotes, drill.defaultNotes)
-    };
-  }
-
   // ===== Render the shared session =====
   function renderSession(plan, options) {
     options = options || {};
@@ -1241,7 +1025,15 @@ This material is proprietary and may not be reproduced or distributed without ex
     if (pdfBtnLocal) pdfBtnLocal.disabled = false;
 
     rows.forEach((row, index) => {
-      const mergedDrill = mergeRowWithLibrary(row);
+      const drill = DRILL_BY_ID.get(row.drillId) || {};
+      const fallbackDrill = {
+        name: row.drillName || '',
+        imageUrl: row.imageUrl || '',
+        videoUrl: row.videoUrl || '',
+        pdfUrl: row.pdfUrl || '',
+        defaultNotes: row.defaultNotes || ''
+      };
+      const mergedDrill = Object.assign({}, fallbackDrill, drill || {});
       const imgUrl   = mergedDrill.imageUrl || '';
       const videoUrl = mergedDrill.videoUrl || '';
       const pdfUrl   = mergedDrill.pdfUrl   || '';
@@ -1256,7 +1048,7 @@ This material is proprietary and may not be reproduced or distributed without ex
           <div class="activity-visual-inner">
             ${
               imgUrl
-                ? `<img src="${imgUrl}" alt="${mergedDrill.name || 'Session diagram'}" loading="eager" decoding="async" fetchpriority="high">`
+                ? `<img src="${imgUrl}" alt="${mergedDrill.name || 'Session diagram'}">`
                 : `<div style="padding:18px;color:#e5e7eb;font-size:11px;text-align:center;">Session diagram</div>`
             }
             <div class="activity-visual-hint">
@@ -1297,7 +1089,7 @@ This material is proprietary and may not be reproduced or distributed without ex
   }
 
   // ===== PDF generation from shared plan =====
-  async function downloadPdfFromPlan(plan) {
+  function downloadPdfFromPlan(plan) {
     const rows = Array.isArray(plan.rows) ? plan.rows : [];
     const selectedRows = rows.filter(r => !!r.drillId);
 
@@ -1308,33 +1100,6 @@ This material is proprietary and may not be reproduced or distributed without ex
     if (selectedRows.length > MAX_PDF_ACTIVITIES) {
       alert('This shared session contains more than ' + MAX_PDF_ACTIVITIES + ' games. Please reduce the number in the planner.');
       return;
-    }
-
-    try {
-      if (planNeedsDrillLibrary(plan) || !DRILLS.length) {
-        const pdfBtnLocal = document.getElementById('download-pdf-btn');
-        const oldBtnText = pdfBtnLocal ? pdfBtnLocal.textContent : '';
-
-        if (pdfBtnLocal) {
-          pdfBtnLocal.disabled = true;
-          pdfBtnLocal.textContent = 'Preparing images...';
-        }
-
-        await loadDrillsViaJSONP();
-        renderSession(plan);
-
-        if (pdfBtnLocal) {
-          pdfBtnLocal.disabled = false;
-          pdfBtnLocal.textContent = oldBtnText || 'Download PDF';
-        }
-      }
-    } catch (e) {
-      console.warn('Could not load drill library before PDF print:', e);
-      const pdfBtnLocal = document.getElementById('download-pdf-btn');
-      if (pdfBtnLocal) {
-        pdfBtnLocal.disabled = false;
-        pdfBtnLocal.textContent = 'Download PDF';
-      }
     }
 
     const dateVal  = plan.date || '';
@@ -1368,7 +1133,15 @@ This material is proprietary and may not be reproduced or distributed without ex
 
       const activitiesHtml = pageRows.map((row, idxOnPage) => {
         const globalIndex = pageIndex * MAX_PER_PAGE + idxOnPage + 1;
-        const mergedDrill = mergeRowWithLibrary(row);
+        const drill = DRILL_BY_ID.get(row.drillId) || {};
+        const fallbackDrill = {
+          name: row.drillName || '',
+          imageUrl: row.imageUrl || '',
+          videoUrl: row.videoUrl || '',
+          pdfUrl: row.pdfUrl || '',
+          defaultNotes: row.defaultNotes || ''
+        };
+        const mergedDrill = Object.assign({}, fallbackDrill, drill || {});
         const notesText = row.notes || mergedDrill.defaultNotes || '';
         const timeText  = row.time || '';
         const imgUrl    = mergedDrill.imageUrl || '';
@@ -1878,11 +1651,11 @@ This material is proprietary and may not be reproduced or distributed without ex
     if (!rows.length) return false;
 
     return rows.some(row => {
-      const hasId = !!String(row.drillId || "").trim();
+      const hasName  = !!String(row.drillName || "").trim();
       const hasImage = !!String(row.imageUrl || "").trim();
-
-      // Video/PDF no longer counts as enough. The viewer needs the actual image too.
-      return hasId && !hasImage;
+      const hasVideo = !!String(row.videoUrl || "").trim();
+      const hasPdf   = !!String(row.pdfUrl || "").trim();
+      return !(hasName && (hasImage || hasVideo || hasPdf));
     });
   }
 
@@ -1938,28 +1711,14 @@ This material is proprietary and may not be reproduced or distributed without ex
       return;
     }
 
-    // If the shared payload is missing image URLs, wait for the drill library first.
-    // This prevents mobile/fresh devices from showing placeholders from old/incomplete cache.
-    if (planNeedsDrillLibrary(freshPlan)) {
-      setStatusHero('Loading session resources…', '', true);
-
-      try {
-        await loadDrillsViaJSONP();
-        console.log('Loaded drills before render:', DRILLS.length);
-      } catch (e) {
-        console.warn('Drill hydrate failed before render:', e);
-      }
-
-      renderSession(freshPlan);
-      return;
-    }
-
     renderSession(freshPlan);
 
-    // 3) Still hydrate drills in the background so every device gets the newest library.
+    // 3) Hydrate drills only if needed
+    if (!planNeedsDrillLibrary(freshPlan)) return;
+
     loadDrillsViaJSONP()
       .then(() => {
-        console.log('Loaded drills in background:', DRILLS.length);
+        console.log('Loaded drills:', DRILLS.length);
         renderSession(freshPlan);
       })
       .catch((e) => {
