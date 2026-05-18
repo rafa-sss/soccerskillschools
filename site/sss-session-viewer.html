@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <link rel="preconnect" href="https://script.google.com">
-  <link rel="preconnect" href="https://images.squarespace-cdn.com">
-  <link rel="preconnect" href="https://drive.google.com">
-
+<link rel="preconnect" href="https://images.squarespace-cdn.com">
+<link rel="preconnect" href="https://drive.google.com">
+  
   <meta charset="utf-8" />
   <title>Soccer Skill Schools – Session Viewer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -37,11 +37,11 @@
       position:relative;
     }
     header.session-header {
-      display: grid;
-      grid-template-columns: 1fr auto 1fr;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 12px;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr; /* left | center | right */
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
     }
     .session-brand {
       font-weight:700;
@@ -49,30 +49,37 @@
       font-size:11px;
       text-transform:uppercase;
     }
-    .session-brand:first-child {
-      justify-self: center;
-    }
-    .session-brand:last-child {
-      justify-self: center;
-      text-align: center;
-    }
+
+    /* Left + right header columns */
+.session-brand:first-child {
+  justify-self: center;
+}
+
+.session-brand:last-child {
+  justify-self: center;
+  text-align: center;
+}
+
     .session-logo {
       position:absolute;
-      top:16px;
+      top:16px;     /* adjust if needed */
       left:20px;
-      height:125px;
+      height:125px;  /* viewer logo size */
       width:auto;
       display:block;
     }
+
     @media print {
       .session-logo {
         height:40px;
       }
-    }
+}
+
+
     .session-title-wrap {
       justify-self: center;
-      text-align: center;
-      max-width: 560px;
+    text-align: center;
+    max-width: 560px;
     }
     .session-title {
       margin:0;
@@ -88,6 +95,7 @@
       color:#b91c1c;
       font-weight:600;
     }
+
     .session-actions {
       display:flex;
       justify-content:flex-end;
@@ -95,6 +103,7 @@
       gap:8px;
       flex-wrap:wrap;
     }
+
     .btn {
       display:inline-flex;
       align-items:center;
@@ -125,6 +134,7 @@
       box-shadow:none;
       background:#f9fafb;
     }
+
     .session-meta {
       display:grid;
       grid-template-columns:repeat(4,minmax(0,1fr));
@@ -146,6 +156,7 @@
       min-height:20px;
       font-size:11px;
     }
+
     .activities-label {
       font-size:11px;
       text-transform:uppercase;
@@ -154,6 +165,7 @@
       margin:4px 0 8px;
       font-weight:600;
     }
+
     .activity-list {
       display:flex;
       flex-direction:column;
@@ -163,6 +175,7 @@
     .activity-list.is-loading {
       min-height: 150px;
     }
+
     .activity-row {
       display:grid;
       grid-template-columns:40% 60%;
@@ -181,23 +194,12 @@
       overflow:hidden;
       background:#020617;
       position:relative;
-      min-height:120px;
     }
     .activity-visual-inner img {
       display:block;
       width:100%;
       height:auto;
       object-fit:contain;
-    }
-    .activity-visual-placeholder {
-      padding:18px;
-      color:#e5e7eb;
-      font-size:11px;
-      text-align:center;
-      min-height:120px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
     }
     .activity-visual-hint {
       position:absolute;
@@ -212,6 +214,7 @@
       text-align:center;
       pointer-events:none;
     }
+
     .activity-notes h3 {
       margin:0 0 3px;
       font-size:12px;
@@ -240,6 +243,8 @@
     .activity-links a:hover {
       text-decoration:underline;
     }
+
+
     @keyframes sssLogoScale {
       0%, 100% { transform: scale(1); }
       50% { transform: scale(1.12); }
@@ -277,11 +282,13 @@
     }
     .session-status-hero.is-error .session-status-hero__text { color:#b91c1c; }
     .session-status-hero.is-ok .session-status-hero__text { color:#166534; }
+
     .empty-message {
       font-size:13px;
       color:var(--sub);
       padding:10px 0 4px;
     }
+
     .session-footer {
       margin-top:12px;
       padding-top:6px;
@@ -348,51 +355,68 @@
       display:block;
     }
 
-    /* =========================================================
-     MOBILE LAYOUT (STACKED + CENTERED)
-     ========================================================= */
-    @media (max-width: 900px) {
-      header.session-header{
-        display: grid;
-        grid-template-columns: 1fr;
-        justify-items: center;
-        text-align: center;
-        margin-bottom: 12px;
-      }
-      .session-title-wrap{
-        text-align: center;
-        max-width: 100%;
-      }
-      .session-logo{
-        position: static;
-        height: 90px;
-        margin: 0 auto 8px;
-        display: block;
-      }
-      .session-brand:last-child{
-        display: none;
-      }
-      .session-actions{
-        justify-content: center;
-      }
-      .session-status-hero{
-        padding: 6px 4px 8px;
-      }
-      .session-status-hero__logo{
-        width: 82px;
-        max-width: 42vw;
-      }
-      .session-status-hero__text{
-        font-size: 13px;
-        max-width: 300px;
-      }
-      .activity-row{
-        grid-template-columns: minmax(0,1fr);
-      }
-      .session-meta{
-        grid-template-columns: repeat(2, minmax(0,1fr));
-      }
-    }
+  /* =========================================================
+   MOBILE LAYOUT (STACKED + CENTERED)
+   - Fix absolute logo overlap by making it static on mobile
+   - Center the Download PDF button
+   - Hide the right "Session Plan" label on mobile
+   ========================================================= */
+@media (max-width: 900px) {
+
+  /* 1-column stacked header */
+  header.session-header{
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+    margin-bottom: 12px;
+  }
+
+  .session-title-wrap{
+    text-align: center;
+    max-width: 100%;
+  }
+
+  /* Make logo participate in layout (so it stacks above title) */
+  .session-logo{
+    position: static;
+    height: 90px;          /* smaller logo on mobile */
+    margin: 0 auto 8px;    /* center it + add spacing */
+    display: block;
+  }
+
+  /* Hide the right-side label */
+  .session-brand:last-child{
+    display: none;
+  }
+
+  /* Center the Download PDF button */
+  .session-actions{
+    justify-content: center;
+  }
+
+  .session-status-hero{
+    padding: 6px 4px 8px;
+  }
+  .session-status-hero__logo{
+    width: 82px;
+    max-width: 42vw;
+  }
+  .session-status-hero__text{
+    font-size: 13px;
+    max-width: 300px;
+  }
+
+  /* Your existing responsive behavior */
+  .activity-row{
+    grid-template-columns: minmax(0,1fr);
+  }
+  .session-meta{
+    grid-template-columns: repeat(2, minmax(0,1fr));
+  }
+}
+
+
   </style>
 </head>
 <body>
@@ -400,10 +424,12 @@
     <section class="session-card" id="session-viewer">
       <header class="session-header">
         <div class="session-brand">
-          <img
-            src="https://images.squarespace-cdn.com/content/68c441422ebffe2e9bfd31ed/a323dcda-562c-4f58-a955-c26cc0207bed/ISS-Logo.png?content-type=image%2Fpng"
-            alt="Illinois Skill Schools logo"
-            class="session-logo">
+          
+        <img
+              src="https://images.squarespace-cdn.com/content/68c441422ebffe2e9bfd31ed/a323dcda-562c-4f58-a955-c26cc0207bed/ISS-Logo.png?content-type=image%2Fpng"
+              alt="Illinois Skill Schools logo"
+              class="session-logo">
+
         </div>
         <div class="session-title-wrap">
           <h1 class="session-title">Interactive Session Plan</h1>
@@ -414,16 +440,18 @@
             Shared link – this session cannot be edited here.
           </p>
           <p class="session-subtitle" id="expiry-display" style="display:none;"></p>
+
         </div>
         <div class="session-brand" style="text-align:right;">Session Plan</div>
       </header>
 
-      <div class="session-actions">
+           <div class="session-actions">
         <button type="button" class="btn" id="download-pdf-btn">
           Download PDF
         </button>
       </div>
 
+      <!-- NEW: shows when the shared link is expired -->
       <p class="empty-message" id="expired-message" style="display:none;color:#b91c1c;">
         This shared session link has expired. Please contact your coach for a new link.
       </p>
@@ -502,10 +530,10 @@ This material is proprietary and may not be reproduced or distributed without ex
   ];
 
   const DRILL_CACHE_KEY = "sss_drills_cache_v2";
-  const DRILL_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+  const DRILL_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
   const SHARED_SESSION_CACHE_PREFIX = "sss_shared_session_v1:";
-  const SHARED_SESSION_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+  const SHARED_SESSION_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
   const MAX_PDF_ACTIVITIES = 15;
   const MAX_PDF_ACTIVITIES_PER_PAGE = 4;
@@ -513,7 +541,6 @@ This material is proprietary and may not be reproduced or distributed without ex
   let DRILLS = [];
   let DRILL_BY_ID = new Map();
   let currentPlan = null;
-  let drillHydratePromise = null;
 
   function splitList(val) {
     const raw = (val || "").toString().trim();
@@ -642,18 +669,20 @@ This material is proprietary and may not be reproduced or distributed without ex
     });
   }
 
-  function ensureDrillsHydrated() {
-    if (DRILLS.length && DRILL_BY_ID.size) return Promise.resolve(DRILLS);
-
-    if (!drillHydratePromise) {
-      drillHydratePromise = loadDrillsViaJSONP()
-        .catch((err) => {
-          drillHydratePromise = null;
-          throw err;
-        });
-    }
-
-    return drillHydratePromise;
+  // Always attach the click handler (even if the link is missing/invalid).
+  const pdfBtn = document.getElementById('download-pdf-btn');
+  if (pdfBtn) {
+    pdfBtn.addEventListener('click', () => {
+      if (!currentPlan) {
+        alert('No shared session found to print. Please open a valid shared link from the planner.');
+        return;
+      }
+      if (isPlanExpired(currentPlan)) {
+        alert('This shared session link has expired. Please contact your coach for a new link.');
+        return;
+      }
+      downloadPdfFromPlan(currentPlan);
+    });
   }
 
   // ===== Shared-session loading via Netlify proxy =====
@@ -769,6 +798,7 @@ This material is proprietary and may not be reproduced or distributed without ex
       const now = new Date();
       let expiry = null;
 
+      // Prefer explicit expiry from planner
       if (plan.expiry) {
         const e = new Date(plan.expiry);
         if (!isNaN(e.getTime())) {
@@ -776,6 +806,7 @@ This material is proprietary and may not be reproduced or distributed without ex
         }
       }
 
+      // Fallback: generatedAt + 90 days
       if (!expiry && plan.generatedAt) {
         const g = new Date(plan.generatedAt);
         if (!isNaN(g.getTime())) {
@@ -954,95 +985,6 @@ This material is proprietary and may not be reproduced or distributed without ex
     if (e.target === videoModal) closeVideo();
   });
 
-  // =========================================================
-  // IMPORTANT FIXES
-  // 1) Fresh mobile devices may not have the drill library cached.
-  // 2) A shared row may have a name/video/PDF but no imageUrl.
-  // 3) This merges the shared row with the full drill library when available.
-  // =========================================================
-  function firstNonEmpty() {
-    for (const value of arguments) {
-      const str = String(value == null ? '' : value).trim();
-      if (str) return str;
-    }
-    return '';
-  }
-
-  function getDriveFileId(url) {
-    const raw = String(url || '').trim();
-    if (!raw) return '';
-
-    const patterns = [
-      /\/file\/d\/([^/]+)/,
-      /[?&]id=([^&]+)/,
-      /\/d\/([^/]+)/
-    ];
-
-    for (const pattern of patterns) {
-      const match = raw.match(pattern);
-      if (match && match[1]) return decodeURIComponent(match[1]);
-    }
-
-    return '';
-  }
-
-  function normalizeImageUrl(url) {
-    const raw = String(url || '').trim();
-    if (!raw) return '';
-
-    // If a Drive preview accidentally gets used as an image, convert it to a thumbnail image.
-    if (/drive\.google\.com/i.test(raw)) {
-      const id = getDriveFileId(raw);
-      if (id) return `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1600`;
-    }
-
-    return raw;
-  }
-
-  function findDrillInLibrary(row) {
-    const id = String(row && row.drillId || '').trim();
-    if (id && DRILL_BY_ID.has(id)) return DRILL_BY_ID.get(id) || {};
-
-    const rowName = String(row && row.drillName || '').trim().toLowerCase();
-    if (rowName && Array.isArray(DRILLS) && DRILLS.length) {
-      return DRILLS.find(d => String(d.name || '').trim().toLowerCase() === rowName) || {};
-    }
-
-    return {};
-  }
-
-  function mergeRowWithLibrary(row) {
-    const drill = findDrillInLibrary(row) || {};
-
-    const imageUrl = normalizeImageUrl(firstNonEmpty(
-      row && row.imageUrl,
-      drill.imageUrl,
-      drill.driveImagePreviewUrl
-    ));
-
-    return {
-      id: firstNonEmpty(row && row.drillId, drill.id),
-      name: firstNonEmpty(row && row.drillName, drill.name),
-      imageUrl,
-      videoUrl: firstNonEmpty(row && row.videoUrl, drill.videoUrl),
-      pdfUrl: firstNonEmpty(row && row.pdfUrl, drill.pdfUrl),
-      defaultNotes: firstNonEmpty(row && row.defaultNotes, drill.defaultNotes)
-    };
-  }
-
-  function planNeedsDrillLibrary(plan) {
-    const rows = Array.isArray(plan && plan.rows) ? plan.rows : [];
-    if (!rows.length) return false;
-
-    return rows.some(row => {
-      const hasId = !!String(row.drillId || '').trim();
-      const hasImage = !!String(row.imageUrl || '').trim();
-
-      // Video/PDF no longer counts as enough. The viewer needs the actual image too.
-      return hasId && !hasImage;
-    });
-  }
-
   // ===== Render the shared session =====
   function renderSession(plan, options) {
     options = options || {};
@@ -1083,10 +1025,18 @@ This material is proprietary and may not be reproduced or distributed without ex
     if (pdfBtnLocal) pdfBtnLocal.disabled = false;
 
     rows.forEach((row, index) => {
-      const mergedDrill = mergeRowWithLibrary(row);
+      const drill = DRILL_BY_ID.get(row.drillId) || {};
+      const fallbackDrill = {
+        name: row.drillName || '',
+        imageUrl: row.imageUrl || '',
+        videoUrl: row.videoUrl || '',
+        pdfUrl: row.pdfUrl || '',
+        defaultNotes: row.defaultNotes || ''
+      };
+      const mergedDrill = Object.assign({}, fallbackDrill, drill || {});
       const imgUrl   = mergedDrill.imageUrl || '';
       const videoUrl = mergedDrill.videoUrl || '';
-      const pdfUrl   = mergedDrill.pdfUrl || '';
+      const pdfUrl   = mergedDrill.pdfUrl   || '';
       const notes    = row.notes || mergedDrill.defaultNotes || '';
       const time     = row.time || '';
 
@@ -1098,8 +1048,8 @@ This material is proprietary and may not be reproduced or distributed without ex
           <div class="activity-visual-inner">
             ${
               imgUrl
-                ? `<img src="${imgUrl}" alt="${mergedDrill.name || 'Session diagram'}" loading="eager" decoding="async" fetchpriority="high">`
-                : `<div class="activity-visual-placeholder">Session diagram</div>`
+                ? `<img src="${imgUrl}" alt="${mergedDrill.name || 'Session diagram'}">`
+                : `<div style="padding:18px;color:#e5e7eb;font-size:11px;text-align:center;">Session diagram</div>`
             }
             <div class="activity-visual-hint">
               ${
@@ -1113,7 +1063,11 @@ This material is proprietary and may not be reproduced or distributed without ex
         <div class="activity-notes">
           <h3>${index + 1}. ${mergedDrill.name || 'Activity'}</h3>
           ${time ? `<p class="activity-time"><strong>Time:</strong> ${time}</p>` : ''}
-          ${notes ? `<p>${notes.replace(/\n/g,'<br>')}</p>` : ''}
+          ${
+            notes
+              ? `<p>${notes.replace(/\n/g,'<br>')}</p>`
+              : ''
+          }
           <div class="activity-links">
             ${pdfUrl ? `<a href="${pdfUrl}" target="_blank" rel="noopener">Session PDF</a>` : ''}
             ${videoUrl ? `<a href="${videoUrl}" target="_blank" rel="noopener">Video (open in new tab)</a>` : ''}
@@ -1135,7 +1089,7 @@ This material is proprietary and may not be reproduced or distributed without ex
   }
 
   // ===== PDF generation from shared plan =====
-  async function downloadPdfFromPlan(plan) {
+  function downloadPdfFromPlan(plan) {
     const rows = Array.isArray(plan.rows) ? plan.rows : [];
     const selectedRows = rows.filter(r => !!r.drillId);
 
@@ -1146,29 +1100,6 @@ This material is proprietary and may not be reproduced or distributed without ex
     if (selectedRows.length > MAX_PDF_ACTIVITIES) {
       alert('This shared session contains more than ' + MAX_PDF_ACTIVITIES + ' games. Please reduce the number in the planner.');
       return;
-    }
-
-    const pdfBtnLocal = document.getElementById('download-pdf-btn');
-    const oldBtnText = pdfBtnLocal ? pdfBtnLocal.textContent : '';
-
-    try {
-      if (pdfBtnLocal) {
-        pdfBtnLocal.disabled = true;
-        pdfBtnLocal.textContent = 'Preparing images...';
-      }
-
-      // Critical for mobile/PDF: make sure the full drill library is available before building the print window.
-      if (planNeedsDrillLibrary(plan) || !DRILLS.length) {
-        await ensureDrillsHydrated();
-        renderSession(plan);
-      }
-    } catch (e) {
-      console.warn('Could not hydrate drill library before PDF print:', e);
-    } finally {
-      if (pdfBtnLocal) {
-        pdfBtnLocal.disabled = false;
-        pdfBtnLocal.textContent = oldBtnText || 'Download PDF';
-      }
     }
 
     const dateVal  = plan.date || '';
@@ -1202,7 +1133,15 @@ This material is proprietary and may not be reproduced or distributed without ex
 
       const activitiesHtml = pageRows.map((row, idxOnPage) => {
         const globalIndex = pageIndex * MAX_PER_PAGE + idxOnPage + 1;
-        const mergedDrill = mergeRowWithLibrary(row);
+        const drill = DRILL_BY_ID.get(row.drillId) || {};
+        const fallbackDrill = {
+          name: row.drillName || '',
+          imageUrl: row.imageUrl || '',
+          videoUrl: row.videoUrl || '',
+          pdfUrl: row.pdfUrl || '',
+          defaultNotes: row.defaultNotes || ''
+        };
+        const mergedDrill = Object.assign({}, fallbackDrill, drill || {});
         const notesText = row.notes || mergedDrill.defaultNotes || '';
         const timeText  = row.time || '';
         const imgUrl    = mergedDrill.imageUrl || '';
@@ -1249,7 +1188,7 @@ This material is proprietary and may not be reproduced or distributed without ex
                 <div class="sss-print-field-value">${esc(dateVal)}</div>
               </div>
               <div>
-                <div class="sss-print-field-label">Skills</div>
+                <div class="sss-print-field-label">Coach</div>
                 <div class="sss-print-field-value">${esc(coachVal)}</div>
               </div>
               <div>
@@ -1472,63 +1411,77 @@ This material is proprietary and may not be reproduced or distributed without ex
             min-height: auto;
             overflow: visible;
           }
+
           body.sss-print-safari .sss-print-header {
             grid-template-columns: 74px 1fr 96px;
             gap: 6px;
             margin-bottom: 5px;
           }
+
           body.sss-print-safari .sss-print-logo {
             height: 48px;
           }
+
           body.sss-print-safari .sss-print-title {
             font-size: 19px;
           }
+
           body.sss-print-safari .sss-print-subtitle {
             font-size: 8px;
             margin-top: 2px;
           }
+
           body.sss-print-safari .sss-print-meta {
             gap: 3px;
             margin-bottom: 6px;
           }
+
           body.sss-print-safari .sss-print-field-label {
             font-size: 7px;
             margin-bottom: 1px;
           }
+
           body.sss-print-safari .sss-print-field-value {
             min-height: 15px;
             padding: 2px 4px;
             font-size: 8px;
           }
+
           body.sss-print-safari .sss-print-activities {
             gap: 3px;
             margin-top: 1px;
           }
+
           body.sss-print-safari .sss-print-row {
             grid-template-columns: 45% 55%;
             gap: 3px;
             padding: 3px;
             border-radius: 8px;
           }
+
           body.sss-print-safari .sss-print-visual {
             height: 195px;
             min-height: 195px;
           }
+
           body.sss-print-safari .sss-print-visual img {
             max-width: 100%;
             max-height: 90%;
           }
+
           body.sss-print-safari .sss-print-activity-title {
             margin-bottom: 3px;
             font-size: 11px;
             line-height: 1.1;
             font-weight: 700;
           }
+
           body.sss-print-safari .sss-print-activity-time {
             margin-bottom: 3px;
             font-size: 9px;
             line-height: 1.12;
           }
+
           body.sss-print-safari .sss-print-notes__body {
             font-size: 9px;
             line-height: 1.18;
@@ -1537,6 +1490,7 @@ This material is proprietary and may not be reproduced or distributed without ex
             -webkit-box-orient: vertical;
             overflow: visible;
           }
+
           body.sss-print-safari .sss-print-footer {
             margin-top: 6px;
             padding-top: 4px;
@@ -1548,55 +1502,68 @@ This material is proprietary and may not be reproduced or distributed without ex
             gap: 4px;
             margin-bottom: 4px;
           }
+
           body.sss-print-mobile-safari .sss-print-logo {
             height: 40px;
           }
+
           body.sss-print-mobile-safari .sss-print-title {
             font-size: 16px;
           }
+
           body.sss-print-mobile-safari .sss-print-subtitle {
             font-size: 7px;
             margin-top: 1px;
           }
+
           body.sss-print-mobile-safari .sss-print-meta {
             gap: 2px;
             margin-bottom: 4px;
           }
+
           body.sss-print-mobile-safari .sss-print-field-label {
             font-size: 6.5px;
             margin-bottom: 1px;
           }
+
           body.sss-print-mobile-safari .sss-print-field-value {
             min-height: 12px;
             padding: 2px 3px;
             font-size: 7px;
           }
+
           body.sss-print-mobile-safari .sss-print-activities {
             gap: 2px;
             margin-top: 1px;
           }
+
           body.sss-print-mobile-safari .sss-print-row {
             grid-template-columns: 45% 55%;
             gap: 2px;
             padding: 2px;
             border-radius: 7px;
           }
+
           body.sss-print-mobile-safari .sss-print-visual {
             height: 180px;
             min-height: 180px;
           }
+
           body.sss-print-mobile-safari .sss-print-visual img {
             max-width: 100%;
             max-height: 100%;
           }
+
           body.sss-print-mobile-safari .sss-print-activity-title {
             margin-bottom: 1px;
             font-size: 7.8px;
           }
+
           body.sss-print-mobile-safari .sss-print-activity-time {
             margin-bottom: 1px;
             font-size: 6.8px;
           }
+
           body.sss-print-mobile-safari .sss-print-notes__body {
             font-size: 6.4px;
             line-height: 1.04;
@@ -1605,28 +1572,34 @@ This material is proprietary and may not be reproduced or distributed without ex
             -webkit-box-orient: vertical;
             overflow: visible;
           }
+
           body.sss-print-mobile-safari .sss-print-footer {
             margin-top: 0;
             padding-top: 1px;
             font-size: 5.8px;
           }
+
           body.sss-print-mobile-safari .sss-print-page--4 .sss-print-activities {
             gap: 1px;
             margin-top: 0;
           }
+
           body.sss-print-mobile-safari .sss-print-page--4 .sss-print-row {
             gap: 1px;
             padding: 1px;
           }
+
           body.sss-print-mobile-safari .sss-print-page--4 .sss-print-visual {
             height: 180px;
             min-height: 180px;
           }
+
           body.sss-print-mobile-safari .sss-print-page--4 .sss-print-notes__body {
             font-size: 6.1px;
             line-height: 1.02;
             -webkit-line-clamp: 20;
           }
+
           body.sss-print-mobile-safari .sss-print-page--4 .sss-print-footer {
             margin-top: 0;
             padding-top: 1px;
@@ -1640,38 +1613,24 @@ This material is proprietary and may not be reproduced or distributed without ex
       </html>
     `);
     printWindow.document.close();
-
-    let didPrint = false;
-    const waitAndPrint = function() {
-      if (didPrint) return;
-      didPrint = true;
-
+    printWindow.onload = function() {
       const firePrint = function() {
         setTimeout(function() {
           printWindow.focus();
           printWindow.print();
         }, 300);
       };
-
       try {
         const doc = printWindow.document;
         const imagePromises = Array.from(doc.images || []).map(img => {
-          if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+          if (img.complete) return Promise.resolve();
           return new Promise(resolve => {
-            let doneCalled = false;
-            const done = () => {
-              if (doneCalled) return;
-              doneCalled = true;
-              resolve();
-            };
+            const done = () => resolve();
             img.addEventListener('load', done, { once: true });
             img.addEventListener('error', done, { once: true });
-            setTimeout(done, 5000);
           });
         });
-
         const fontsReady = doc.fonts && doc.fonts.ready ? doc.fonts.ready.catch(() => {}) : Promise.resolve();
-
         Promise.all([fontsReady].concat(imagePromises)).then(() => {
           if (isSafariPrint && printWindow.requestAnimationFrame) {
             printWindow.requestAnimationFrame(() => {
@@ -1685,24 +1644,18 @@ This material is proprietary and may not be reproduced or distributed without ex
         firePrint();
       }
     };
-
-    printWindow.addEventListener('load', waitAndPrint);
-    setTimeout(waitAndPrint, 700);
   }
 
-  // Always attach the click handler.
-  const pdfBtn = document.getElementById('download-pdf-btn');
-  if (pdfBtn) {
-    pdfBtn.addEventListener('click', async () => {
-      if (!currentPlan) {
-        alert('No shared session found to print. Please open a valid shared link from the planner.');
-        return;
-      }
-      if (isPlanExpired(currentPlan)) {
-        alert('This shared session link has expired. Please contact your coach for a new link.');
-        return;
-      }
-      await downloadPdfFromPlan(currentPlan);
+  function planNeedsDrillLibrary(plan) {
+    const rows = Array.isArray(plan && plan.rows) ? plan.rows : [];
+    if (!rows.length) return false;
+
+    return rows.some(row => {
+      const hasName  = !!String(row.drillName || "").trim();
+      const hasImage = !!String(row.imageUrl || "").trim();
+      const hasVideo = !!String(row.videoUrl || "").trim();
+      const hasPdf   = !!String(row.pdfUrl || "").trim();
+      return !(hasName && (hasImage || hasVideo || hasPdf));
     });
   }
 
@@ -1730,7 +1683,7 @@ This material is proprietary and may not be reproduced or distributed without ex
       }
     }
 
-    // 2) Fetch fresh session
+    // 2) Fetch fresh session in background
     const sharedRes = await fetchSharedSessionById(sessionId);
     if (!sharedRes || !sharedRes.ok || !sharedRes.session) {
       if (!cachedPlan) {
@@ -1758,11 +1711,12 @@ This material is proprietary and may not be reproduced or distributed without ex
       return;
     }
 
-    // Render immediately from the saved session payload.
     renderSession(freshPlan);
 
-    // 3) Hydrate drills in the background so mobile/fresh devices can fill missing images.
-    ensureDrillsHydrated()
+    // 3) Hydrate drills only if needed
+    if (!planNeedsDrillLibrary(freshPlan)) return;
+
+    loadDrillsViaJSONP()
       .then(() => {
         console.log('Loaded drills:', DRILLS.length);
         renderSession(freshPlan);
