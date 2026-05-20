@@ -463,7 +463,7 @@
         </div>
         <div>
           <div class="meta-label">Skills</div>
-          <div class="meta-value" id="meta-coach"></div>
+          <div class="meta-value" id="mea-skill"></div>
         </div>
         <div>
           <div class="meta-label">Age group</div>
@@ -989,7 +989,7 @@ This material is proprietary and may not be reproduced or distributed without ex
   function renderSession(plan, options) {
     options = options || {};
     const dateEl   = document.getElementById('meta-date');
-    const coachEl  = document.getElementById('meta-coach');
+    const coachEl  = document.getElementById('meta-skill');
     const ageEl    = document.getElementById('meta-age');
     const themeEl  = document.getElementById('meta-theme');
     const listEl   = document.getElementById('activity-list');
@@ -1188,7 +1188,7 @@ This material is proprietary and may not be reproduced or distributed without ex
                 <div class="sss-print-field-value">${esc(dateVal)}</div>
               </div>
               <div>
-                <div class="sss-print-field-label">Coach</div>
+                <div class="sss-print-field-label">Skill</div>
                 <div class="sss-print-field-value">${esc(coachVal)}</div>
               </div>
               <div>
